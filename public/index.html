@@ -4,148 +4,15 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ablogs — Accounts &amp; digital services</title>
-    <link rel="stylesheet" href="/css/style.css" />
+    <title>Ablogs — Login</title>
+    <meta http-equiv="refresh" content="0; url=/login" />
+    <script>location.replace('/login');</script>
 </head>
 
 <body>
-    <header class="header">
-        <div class="container header-inner">
-            <a class="brand" href="/">
-                <!-- Drop your logo file at public/images/logo.png -->
-                <img src="/images/logo.png" alt="Ablogs"
-                    onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';" />
-                <span class="brand-fallback" style="display:none;">A</span>
-                <span>Ablogs</span>
-            </a>
-            <div class="header-actions">
-                <span class="when-user hidden" id="headerBalance" style="font-weight:700;font-size:0.95rem;">₦0</span>
-                <button type="button" class="btn btn-white when-guest" id="btnHeaderLogin">Login</button>
-                <button type="button" class="btn btn-white when-guest" id="btnHeaderSignup"
-                    style="background:#fff;color:#e10600;">Sign up</button>
-                <button type="button" class="icon-btn" id="btnMenu" aria-label="Menu">☰</button>
-            </div>
-        </div>
-    </header>
-
-    <div class="overlay" id="overlay"></div>
-    <aside class="sidenav" id="sidenav">
-        <button type="button" class="close-nav" id="btnCloseNav">×</button>
-        <h3>Menu</h3>
-        <p class="when-user hidden" id="navUserName" style="font-weight:700;margin-bottom:8px;"></p>
-        <a href="/">Dashboard / Home</a>
-        <a href="#shopSection">Shop / Search</a>
-        <button type="button" class="nav-link when-user hidden" id="navOrders">My orders</button>
-        <button type="button" class="nav-link when-user hidden" id="navTx">Transactions</button>
-        <button type="button" class="nav-link when-guest" id="navLogin">Login</button>
-        <button type="button" class="nav-link when-guest" id="navSignup">Sign up</button>
-        <button type="button" class="nav-link" id="navWa">WhatsApp support</button>
-        <button type="button" class="nav-link when-user hidden" id="navLogout">Logout</button>
-    </aside>
-
-    <main class="page">
-        <div class="search-wrap">
-            <div class="search-box">
-                <span>🔍</span>
-                <input type="search" id="searchInput" placeholder="Search FB, IG, VPN..." />
-                <button type="button" id="btnSearch">Search</button>
-            </div>
-        </div>
-        <p class="hero-note">Buy accounts &amp; digital services · Wallet coming with payment gateway</p>
-
-        <div class="container">
-            <div class="guest-banner when-guest">
-                <h2>Welcome to Ablogs</h2>
-                <p>Login or create an account to track balance, orders and transactions.</p>
-                <button type="button" class="btn btn-red" onclick="AblogsOpenAuth('signup')">Create account</button>
-                <button type="button" class="btn btn-outline" style="margin-left:8px;"
-                    onclick="AblogsOpenAuth('login')">Login</button>
-            </div>
-
-            <div id="dashStats" class="stats when-user hidden"></div>
-
-            <h3 class="section-title" id="recentTitle">Recent activity</h3>
-            <div class="list-card" id="recentList">
-                <div class="list-row"><span class="muted">Login to see your activity</span></div>
-            </div>
-
-            <h3 class="section-title" id="shopSection">Shop</h3>
-            <div class="products" id="productGrid"></div>
-        </div>
-    </main>
-
-    <footer class="footer">
-        <div class="container footer-inner">
-            <div>
-                <strong>Ablogs</strong>
-                <div style="opacity:0.9;font-size:0.9rem;">Accounts · VPN · Digital services</div>
-            </div>
-            <div style="font-size:0.9rem;">
-                <a href="#" onclick="AblogsOpenAuth('login');return false;">Login</a>
-                ·
-                <a href="#" id="footerWa" onclick="document.getElementById('fabWa').click();return false;">WhatsApp</a>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Auth circle / modal -->
-    <div class="modal-overlay" id="authModal">
-        <div class="auth-modal">
-            <button type="button" class="close-x" id="btnCloseAuth">×</button>
-            <div class="auth-tabs">
-                <button type="button" data-mode="login" class="active">Login</button>
-                <button type="button" data-mode="signup">Sign up</button>
-            </div>
-            <form id="authForm">
-                <div id="signupFields" class="hidden">
-                    <div class="form-group">
-                        <label>Full name</label>
-                        <input type="text" id="authName" placeholder="Your name" />
-                    </div>
-                    <div class="form-group">
-                        <label>Phone</label>
-                        <input type="tel" id="authPhone" placeholder="080..." />
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="authEmail" required placeholder="you@email.com" />
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="authPassword" required placeholder="Min 6 characters" minlength="6" />
-                </div>
-                <div class="form-error" id="authError"></div>
-                <button type="submit" class="btn btn-red btn-block" id="authSubmit">Login</button>
-            </form>
-            <p class="auth-hint">Secure login for your Ablogs wallet &amp; orders</p>
-        </div>
-    </div>
-
-    <!-- WhatsApp left -->
-    <div class="float-left">
-        <button type="button" class="fab fab-wa" id="fabWa" title="WhatsApp">WA</button>
-    </div>
-
-    <!-- Live support right -->
-    <div class="float-right">
-        <button type="button" class="fab fab-chat" id="fabChat" title="Live support">💬</button>
-    </div>
-
-    <div class="chat-panel" id="chatPanel">
-        <div class="chat-head">
-            <span>Ablogs support</span>
-            <button type="button" id="btnCloseChat">×</button>
-        </div>
-        <div class="chat-body" id="chatBody"></div>
-        <div class="chat-foot">
-            <input type="text" id="chatInput" placeholder="Type a message..." />
-            <button type="button" id="chatSend">Send</button>
-        </div>
-    </div>
-
-    <div class="toast" id="toast"></div>
-    <script src="/js/app.js"></script>
+    <p style="font-family:system-ui;text-align:center;margin-top:40px;">
+        Redirecting to login… <a href="/login">Continue</a>
+    </p>
 </body>
 
 </html>

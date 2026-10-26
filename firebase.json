@@ -1,0 +1,80 @@
+{
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/",
+        "destination": "/pages/login.html"
+      },
+      {
+        "source": "/login",
+        "destination": "/pages/login.html"
+      },
+      {
+        "source": "/signup",
+        "destination": "/pages/signup.html"
+      },
+      {
+        "source": "/dashboard",
+        "destination": "/pages/dashboard.html"
+      },
+      {
+        "source": "/admin",
+        "destination": "/pages/admin.html"
+      },
+      {
+        "source": "/wallet",
+        "destination": "/pages/wallet.html"
+      },
+      {
+        "source": "/products",
+        "destination": "/pages/products.html"
+      },
+      {
+        "source": "/purchases",
+        "destination": "/pages/purchases.html"
+      },
+      {
+        "source": "/orders",
+        "destination": "/pages/purchases.html"
+      },
+      {
+        "source": "/profile",
+        "destination": "/pages/profile.html"
+      },
+      {
+        "source": "/working-pictures",
+        "destination": "/pages/working-pictures.html"
+      },
+      {
+        "source": "/tools",
+        "destination": "/pages/tools.html"
+      },
+      {
+        "source": "/format",
+        "destination": "/pages/format.html"
+      },
+      {
+        "source": "/category",
+        "destination": "/pages/category.html"
+      },
+      {
+        "source": "/forgot-password",
+        "destination": "/pages/forgot-password.html"
+      },
+      {
+        "source": "/shop",
+        "destination": "/pages/shop.html"
+      },
+      {
+        "source": "**",
+        "destination": "/pages/login.html"
+      }
+    ]
+  }
+}
