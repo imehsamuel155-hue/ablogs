@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Logs — Ablogs</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/app-ui.css" />
+</head>
+
+<body class="app-shell">
+    <header class="topbar">
+        <a class="logo" href="/dashboard"><span>Ablogs</span></a>
+        <button type="button" id="btnMenu" class="menu-btn">☰</button>
+    </header>
+    <div class="side-drawer" id="drawer">
+        <div class="dim" id="drawerDim"></div>
+        <div class="panel">
+            <p class="drawer-title" id="drawerName">Menu</p>
+            <a href="/dashboard">Dashboard</a>
+            <a href="/products" class="active">Logs</a>
+            <a href="/wallet">Wallet</a>
+            <a href="/purchases">Orders</a>
+            <a href="/profile">Profile</a>
+            <a href="/working-pictures">Working Pictures</a>
+            <a href="/tools">Tools</a>
+            <a href="/format">Format</a>
+            <a href="#" class="nav-coming-soon" onclick="return false;" aria-disabled="true">Buy WhatsApp / Rent number
+                <span class="coming">Coming soon</span></a>
+            <a href="#" id="navLogout" class="logout-link">Logout</a>
+        </div>
+    </div>
+    <div class="section">
+        <h2 style="margin:8px 0 4px;">Logs</h2>
+        <div class="balance-pill">Balance: <strong id="balPill">₦0</strong> <a href="/wallet">+ Fund Wallet</a></div>
+        <input class="search-round" id="searchCat" placeholder="Search logs..." />
+        <select id="filterCat" class="cat-select-dash" style="margin-top:8px;">
+            <option value="">All categories</option>
+        </select>
+        <div class="cat-grid" id="catGrid" style="margin-top:12px;"></div>
+    </div>
+    <div class="chat-full" id="chatFull">
+        <div class="ch-head"><span class="ch-title">Live support</span><button type="button" id="btnCloseChat"
+                class="ch-close-x" aria-label="Close chat" title="Back to dashboard">✕</button></div>
+        <div class="ch-body" id="chatBody"></div>
+        <div class="ch-foot" style="display:flex;gap:6px;align-items:center;">
+            <label style="cursor:pointer;padding:6px 8px;background:#f1f5f9;border-radius:8px;">📷<input type="file"
+                    id="chatPhoto" accept="image/*" style="display:none;" /></label>
+            <input id="chatInput" style="flex:1;" /><button id="chatSend">Send</button>
+        </div>
+    </div>
+    <div class="toast-m" id="toast"></div>
+    <script src="/js/marketplace.js"></script>
+    <script>Market.initProducts();</script>
+</body>
+
+</html>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orders — Ablogs</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/app-ui.css" />
+</head>
+
+<body class="app-shell">
+    <header class="topbar">
+        <a class="logo" href="/dashboard"><span>Ablogs</span></a>
+        <button type="button" id="btnBackDash" class="page-back-x" aria-label="Back to dashboard"
+            title="Back to dashboard">✕</button>
+    </header>
+    <main class="section">
+        <h2 style="margin-bottom:8px;">Orders</h2>
+        <p class="muted" style="margin-bottom:14px;">Tap View → Copy login.</p>
+        <div id="purchaseList" style="background:#fff;border-radius:14px;border:1px solid var(--line);">
+            <div style="padding:16px;color:#94a3b8;">Loading…</div>
+        </div>
+    </main>
+    <div id="deliveryModal" class="ann-overlay" style="display:none;">
+        <div class="ann-card">
+            <button type="button" class="ann-x" id="closeDelivery">×</button>
+            <h2 style="color:#dc2626;">Order details</h2>
+            <div id="deliveryBody"></div>
+            <button type="button" class="btn btn-red" id="btnCopyLogin" style="width:100%;margin-top:10px;">Copy
+                login</button>
+        </div>
+    </div>
+    <div class="toast-m" id="toast"></div>
+    <script src="/js/marketplace.js"></script>
+    <script>
+        if (!localStorage.getItem('ablogs_token')) location.href = '/login';
+        (function () {
+            document.getElementById('btnBackDash')?.addEventListener('click', () => {
+                location.href = '/dashboard';
+            });
+            function toast(m) {
+                const t = document.getElementById('toast');
+                t.textContent = m; t.classList.add('show');
+                setTimeout(() => t.classList.remove('show'), 2200);
+            }
+            (async function () {
+                const res = await fetch('/api/user/orders', {
+                    headers: { Authorization: 'Bearer ' + localStorage.getItem('ablogs_token') }
+                });
+                const data = await res.json();
+                const box = document.getElementById('purchaseList');
+                if (!data.orders || !data.orders.length) {
+                    box.innerHTML = '<div style="padding:16px;color:#94a3b8;">No orders yet. Buy from Logs.</div>';
+                    return;
+                }
+                box.innerHTML = data.orders.map((o) => {
+                    const when = new Date(o.createdAt).toLocaleString();
+                    return `<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #f1f5f9;">
+            <div style="flex:1;">
+              <strong>${o.productTitle || 'Item'}</strong>
+              <div style="font-size:0.8rem;color:#64748b;">${when} · ₦${Number(o.amount).toLocaleString()}</div>
+            </div>
+            <button type="button" class="btn btn-red btn-view" data-id="${o._id}" style="padding:8px 14px;border-radius:999px;">View</button>
+          </div>`;
+                }).join('');
+                function parseDelivery(o) {
+                    try { return typeof o.deliveryInfo === 'string' ? JSON.parse(o.deliveryInfo || '{}') : (o.deliveryInfo || {}); }
+                    catch { return {}; }
+                }
+                box.querySelectorAll('.btn-view').forEach((btn) => {
+                    btn.addEventListener('click', () => {
+                        const o = data.orders.find((x) => String(x._id) === btn.getAttribute('data-id'));
+                        if (!o) return;
+                        const d = parseDelivery(o);
+                        document.getElementById('deliveryBody').innerHTML = `
+              <p><strong>${o.productTitle || 'Item'}</strong></p>
+              <p style="color:#64748b;font-size:0.85rem;">${new Date(o.createdAt).toLocaleString()} · ₦${Number(o.amount).toLocaleString()}</p>
+              <textarea id="loginTa" readonly style="width:100%;min-height:100px;padding:10px;border-radius:10px;border:1px solid #e5e7eb;">${d.loginDetails || d.telegramLink || 'No login stored'}</textarea>
+            `;
+                        document.getElementById('deliveryModal').style.display = 'flex';
+                    });
+                });
+                document.getElementById('closeDelivery').onclick = () =>
+                    document.getElementById('deliveryModal').style.display = 'none';
+                document.getElementById('btnCopyLogin').onclick = () => {
+                    const ta = document.getElementById('loginTa');
+                    if (navigator.clipboard) navigator.clipboard.writeText(ta.value).then(() => toast('Copied'));
+                    else { ta.select(); document.execCommand('copy'); toast('Copied'); }
+                };
+            })();
+        })();
+    </script>
+</body>
+
+</html>

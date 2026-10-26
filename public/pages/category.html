@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Log — Ablogs</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/app-ui.css" />
+</head>
+
+<body class="app-shell">
+    <header class="topbar">
+        <a href="/products" style="text-decoration:none;color:var(--ink);font-size:1.2rem;">←</a>
+        <strong id="catTitle">Log</strong>
+        <button type="button" id="btnMenu" style="border:none;background:none;font-size:1.4rem;">☰</button>
+    </header>
+    <div class="side-drawer" id="drawer">
+        <div class="dim" id="drawerDim"></div>
+        <div class="panel">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/products">Logs</a>
+            <a href="/wallet">Wallet</a>
+            <a href="/purchases">Orders</a>
+            <a href="/profile">Profile</a>
+            <a href="#" class="nav-coming-soon" onclick="return false;" aria-disabled="true">Buy WhatsApp / Rent number
+                <span class="coming">Coming soon</span></a>
+            <a href="#" id="navLogout" style="color:#dc2626;">Logout</a>
+        </div>
+    </div>
+    <div class="section">
+        <div class="balance-pill">Wallet Balance: <strong id="balPill">₦0</strong> <a href="/wallet">+ Fund Wallet</a>
+        </div>
+        <div id="productList"></div>
+    </div>
+    <div class="chat-full" id="chatFull">
+        <div class="ch-head"><span class="ch-title">Live support</span><button type="button" id="btnCloseChat"
+                class="ch-close-x" aria-label="Close chat" title="Back to dashboard">✕</button></div>
+        <div class="ch-body" id="chatBody"></div>
+        <div class="ch-foot" style="display:flex;gap:6px;align-items:center;">
+            <label style="cursor:pointer;padding:6px 8px;background:#f1f5f9;border-radius:8px;">📷<input type="file"
+                    id="chatPhoto" accept="image/*" style="display:none;" /></label>
+            <input id="chatInput" style="flex:1;" /><button id="chatSend">Send</button>
+        </div>
+    </div>
+    <div class="toast-m" id="toast"></div>
+    <script src="/js/marketplace.js"></script>
+    <script>Market.initCategory();</script>
+</body>
+
+</html>

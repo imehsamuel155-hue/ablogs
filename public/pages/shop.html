@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shop — Ablogs</title>
+    <link rel="stylesheet" href="/css/style.css" />
+</head>
+
+<body>
+    <header class="header">
+        <div class="container header-inner">
+            <a class="brand" href="/"><span>Ablogs</span></a>
+            <div class="header-actions">
+                <a class="btn btn-white" href="/dashboard">Dashboard</a>
+                <button type="button" class="icon-btn" id="btnMenu">☰</button>
+            </div>
+        </div>
+    </header>
+    <div class="overlay" id="overlay"></div>
+    <aside class="sidenav" id="sidenav">
+        <button type="button" class="close-nav" id="btnCloseNav">×</button>
+        <h3>Menu</h3>
+        <a href="/">Home</a>
+        <a href="/shop">Shop</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/login">Login</a>
+    </aside>
+    <main class="page">
+        <div class="search-wrap">
+            <div class="search-box">
+                <span>🔍</span>
+                <input type="search" id="searchInput" placeholder="Search FB, IG, VPN..." />
+                <button type="button" id="btnSearch">Search</button>
+            </div>
+        </div>
+        <div class="container">
+            <h3 class="section-title">All products</h3>
+            <div class="products" id="productGrid"></div>
+        </div>
+    </main>
+    <footer class="footer">
+        <div class="container footer-inner"><strong>Ablogs</strong></div>
+    </footer>
+    <div class="toast" id="toast"></div>
+    <script src="/js/app.js"></script>
+</body>
+
+</html>

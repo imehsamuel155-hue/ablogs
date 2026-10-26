@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Dashboard — Ablogs</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/app-ui.css" />
+</head>
+
+<body class="app-shell has-bottom-nav">
+    <header class="topbar">
+        <a class="logo" href="/dashboard">
+            <img src="/images/logo.png" alt="" onerror="this.style.display='none'" />
+            <span id="siteBrand">Ablogs</span>
+        </a>
+        <button type="button" id="btnMenu" class="menu-btn" aria-label="Menu" title="Menu">☰</button>
+    </header>
+
+    <div class="side-drawer" id="drawer">
+        <div class="dim" id="drawerDim"></div>
+        <div class="panel">
+            <p class="drawer-title" id="drawerName">Menu</p>
+            <a href="/dashboard" class="active">Dashboard</a>
+            <a href="/products">Logs</a>
+            <a href="/wallet">Wallet</a>
+            <a href="/purchases">Orders</a>
+            <a href="/profile">Profile</a>
+            <a href="/working-pictures">Working Pictures</a>
+            <a href="/tools">Tools</a>
+            <a href="/format">Format</a>
+            <a href="#" id="navWhatsApp">WhatsApp</a>
+            <a href="#" id="navLiveChat">Live chat</a>
+            <a href="#" class="nav-coming-soon" onclick="return false;" aria-disabled="true">Buy WhatsApp / Rent number
+                <span class="coming">Coming soon</span></a>
+            <a href="#" id="navLogout" class="logout-link">Logout</a>
+        </div>
+    </div>
+
+    <div class="dash-time-row">
+        <div class="dash-time-left">
+            <div class="dash-clock" id="clockTime">--:--</div>
+            <div class="dash-greet-line"><span id="greetText">Hello</span>, <span id="userFirst">User</span></div>
+        </div>
+    </div>
+    <p class="dash-sub" id="greetSub">Here's your account overview</p>
+
+    <!-- Clean light balance -->
+    <div class="bal-clean-wrap">
+        <div class="bal-clean-label">Available balance</div>
+        <div class="bal-clean-amount" id="walletBal">₦0</div>
+        <div class="bal-actions">
+            <button type="button" class="btn-fund" id="btnFund">Fund wallet</button>
+            <a class="btn-hist" href="/purchases" id="btnLogHistory">View log history</a>
+        </div>
+    </div>
+
+    <div class="stat-row-4">
+        <div class="stat-chip" id="goOrders">
+            <div class="n" id="statOrders">0</div>
+            <div class="l">Total orders</div>
+        </div>
+        <div class="stat-chip">
+            <div class="n" id="statSpent">₦0</div>
+            <div class="l">Lifetime spend</div>
+        </div>
+        <div class="stat-chip">
+            <div class="n" id="statDeposits">₦0</div>
+            <div class="l">Total funded</div>
+        </div>
+        <div class="stat-chip">
+            <div class="n" id="statDepositTimes">0</div>
+            <div class="l">Deposit times</div>
+        </div>
+    </div>
+
+    <!-- Search + categories below (as before) -->
+    <div class="section" style="padding-top:4px;">
+        <div class="search-cat-row">
+            <input class="search-round" id="dashSearch" placeholder="Search categories..." />
+            <select id="dashCat" class="cat-select-dash">
+                <option value="">All categories</option>
+            </select>
+        </div>
+        <div id="dashSearchResults" class="cat-grid" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="section">
+        <div class="section-h">
+            <h2>Recent Orders</h2>
+            <a href="/purchases">View all</a>
+        </div>
+        <div id="recentOrdersBox"
+            style="background:#fff;border-radius:14px;padding:16px;border:1px solid var(--line);color:var(--muted);">
+            No orders yet
+        </div>
+    </div>
+
+    <div class="community-box" id="communityBox">
+        <h3 id="comTitle">Stay Connected</h3>
+        <div id="comText" style="font-size:0.9rem;color:var(--muted);line-height:1.5;"></div>
+        <a class="btn-c wa" id="comWa" href="https://wa.me/2348022313937" target="_blank" rel="noopener">Message us on
+            WhatsApp</a>
+        <a class="btn-c community" id="comCommunity" href="https://chat.whatsapp.com/JdTW56VIf5GFo0Rzr5GQoE"
+            target="_blank" rel="noopener">Join community</a>
+        <a class="btn-c tg" id="comTg" href="#" target="_blank" rel="noopener" style="display:none;">Join our
+            Telegram</a>
+        <a class="btn-c wg" id="comWg" href="#" target="_blank" rel="noopener" style="display:none;">Join our WhatsApp
+            Group</a>
+        <p style="text-align:center;margin-top:12px;font-size:0.8rem;color:#94a3b8;" id="comSite"></p>
+    </div>
+
+    <!-- Bottom: Dashboard + Live chat (text only, smaller) -->
+    <nav class="bottom-nav bottom-nav-2">
+        <a href="/dashboard" class="active"><span class="nav-label">Dashboard</span></a>
+        <a href="#" id="bottomChat" class="bottom-chat-btn"><span class="nav-label">Live chat</span><span
+                class="chat-badge" id="chatBadge">1</span></a>
+    </nav>
+
+    <!-- Need help prompt near Live chat -->
+    <div class="help-bubble" id="helpBubble">
+        <button type="button" class="help-bubble-x" id="helpBubbleX" aria-label="Dismiss">✕</button>
+        <button type="button" class="help-bubble-main" id="helpBubbleOpen">
+            <span class="help-bubble-dot">1</span>
+            <span class="help-bubble-text">Do you need help?</span>
+        </button>
+    </div>
+
+    <button type="button" class="fab-wa" id="fabWa" title="WhatsApp" aria-label="WhatsApp">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff">
+            <path
+                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+        </svg>
+    </button>
+
+    <div class="chat-full" id="chatFull">
+        <div class="ch-head">
+            <span class="ch-title">Live support</span>
+            <button type="button" id="btnCloseChat" class="ch-close-x" aria-label="Close chat"
+                title="Back to dashboard">✕</button>
+        </div>
+        <div class="ch-body" id="chatBody"></div>
+        <div class="ch-foot" style="display:flex;gap:6px;align-items:center;">
+            <label style="cursor:pointer;padding:6px 8px;background:#f1f5f9;border-radius:8px;" title="Send photo">
+                📷
+                <input type="file" id="chatPhoto" accept="image/*" style="display:none;" />
+            </label>
+            <input type="text" id="chatInput" placeholder="Type a message..." style="flex:1;" />
+            <button type="button" id="chatSend">Send</button>
+        </div>
+    </div>
+
+    <div class="ann-overlay" id="annOverlay" style="display:none;">
+        <div class="ann-card">
+            <button type="button" class="ann-x" id="annClose" aria-label="Close">×</button>
+            <h2 id="annTitleEl">Welcome</h2>
+            <p class="ann-sub" id="annSubEl"></p>
+            <div class="ann-body" id="annBodyEl"></div>
+            <a class="btn-c community" id="annCommunity" href="https://chat.whatsapp.com/JdTW56VIf5GFo0Rzr5GQoE"
+                target="_blank" rel="noopener" style="display:block;margin-top:12px;text-align:center;">Join
+                community</a>
+            <a class="btn-c wa" id="annWa" href="https://wa.me/2348022313937" target="_blank" rel="noopener"
+                style="display:block;margin-top:8px;text-align:center;">Message us on WhatsApp</a>
+        </div>
+    </div>
+
+    <div class="toast-m" id="toast"></div>
+    <script src="/js/marketplace.js"></script>
+    <script>Market.initDashboard();</script>
+</body>
+
+</html>

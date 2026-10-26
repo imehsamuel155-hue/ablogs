@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin — Ablogs</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+        body {
+            background: #f8fafc;
+            margin: 0;
+            font-family: system-ui, sans-serif;
+        }
+
+        .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #fff;
+            border-bottom: 1px solid #e5e7eb;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        .brand {
+            font-weight: 800;
+            color: #dc2626;
+            text-decoration: none;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .bell {
+            position: relative;
+            cursor: pointer;
+            font-size: 1.35rem;
+        }
+
+        .bell .dot {
+            position: absolute;
+            top: -4px;
+            right: -8px;
+            background: #ef4444;
+            color: #fff;
+            font-size: 0.65rem;
+            min-width: 16px;
+            height: 16px;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            font-weight: 700;
+        }
+
+        .notif {
+            display: none;
+            position: absolute;
+            right: 12px;
+            top: 52px;
+            width: min(340px, 92vw);
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, .12);
+            z-index: 50;
+            max-height: 360px;
+            overflow-y: auto;
+        }
+
+        .notif.open {
+            display: block;
+        }
+
+        .notif .item {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 0.88rem;
+        }
+
+        .wrap {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+
+        .card h2 {
+            margin: 0 0 12px;
+            font-size: 1.05rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            box-sizing: border-box;
+            font-size: 0.95rem;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            background: #dc2626;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 16px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .btn-out {
+            background: #fff;
+            color: #dc2626;
+            border: 1px solid #dc2626;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 0.85rem;
+        }
+
+        .line {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .line input {
+            margin: 0;
+            flex: 1;
+        }
+
+        .num {
+            width: 28px;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .preview {
+            width: 64px;
+            height: 64px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            margin-right: 6px;
+        }
+
+        .muted {
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f172a;
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 999px;
+            opacity: 0;
+            transition: .2s;
+            z-index: 99;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        .log-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f5f9;
+            align-items: center;
+        }
+
+        .drop-title {
+            cursor: pointer;
+            font-weight: 800;
+            padding: 12px;
+            background: #fef2f2;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .drop-body {
+            display: none;
+        }
+
+        .drop-body.open {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="top">
+        <a class="brand" href="/admin">Ablogs Admin</a>
+        <div class="actions">
+            <button type="button" class="btn-out" id="btnLogout">Logout</button>
+        </div>
+    </div>
+
+
+    <div class="wrap">
+        <div class="card" style="background:#0f172a;color:#fff;border:none;">
+            <h2 style="color:#fff;margin:0 0 8px;">Site overview</h2>
+            <div style="font-size:1.5rem;font-weight:800;" id="siteDepositTotal">₦0</div>
+            <div class="muted" style="color:#94a3b8;margin-top:4px;margin-bottom:12px;">Total deposited · <span
+                    id="siteDepositCount">0</span> deposit(s)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div style="background:#14532d;border-radius:10px;padding:12px;">
+                    <div style="font-size:0.75rem;color:#86efac;">Successful orders</div>
+                    <div style="font-size:1.25rem;font-weight:800;" id="siteSuccessOrders">0</div>
+                    <div style="font-size:0.75rem;color:#bbf7d0;" id="siteSuccessRev">₦0 revenue</div>
+                </div>
+                <div style="background:#7f1d1d;border-radius:10px;padding:12px;">
+                    <div style="font-size:0.75rem;color:#fca5a5;">Failed orders</div>
+                    <div style="font-size:1.25rem;font-weight:800;" id="siteFailedOrders">0</div>
+                    <div style="font-size:0.75rem;color:#fecaca;">Cancelled / failed</div>
+                </div>
+            </div>
+            <div class="muted" style="color:#94a3b8;margin-top:10px;"><span id="siteUsers">0</span> users · <span
+                    id="siteOrders">0</span> total orders · <span id="sitePendingOrders">0</span> pending</div>
+        </div>
+
+        <!-- LOGS -->
+
+
+        <div class="card">
+            <div class="drop-title" data-drop="support">Customer support chat <span>▼</span></div>
+            <div class="drop-body" id="drop-support">
+                <p class="muted">Each customer chats separately. Pick a thread to reply.</p>
+                <div id="chatThreads" class="muted">Loading…</div>
+                <div id="chatPanel" style="display:none;margin-top:12px;">
+                    <div id="chatWith" style="font-weight:700;margin-bottom:8px;"></div>
+                    <div id="chatMsgs"
+                        style="max-height:280px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#f8fafc;margin-bottom:8px;">
+                    </div>
+                    <div class="line">
+                        <input id="chatReply" placeholder="Type reply…" />
+                        <button type="button" class="btn btn-sm" id="btnChatSend">Send</button>
+                    </div>
+                    <label style="cursor:pointer;font-size:0.85rem;">📷 Photo<input type="file" id="chatPhotoAdmin"
+                            accept="image/*" style="display:none;" /></label>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="drop-title" data-drop="logs">Add log <span>▼</span></div>
+            <div class="drop-body" id="drop-logs">
+                <label>Category</label>
+                <select id="pCat">
+                    <option value="">— Select —</option>
+                    <option value="add">Type your own category…</option>
+                </select>
+                <div id="customWrap" style="display:none;">
+                    <label>Custom category name</label>
+                    <input id="pCustom" placeholder="e.g. texting app" />
+                </div>
+                <div id="formBox" style="display:none;">
+                    <label>Photo (gallery)</label>
+                    <input type="file" id="pPhoto" accept="image/*" />
+                    <img id="photoPrev" class="preview" alt="" style="display:none;" />
+                    <label>Title</label>
+                    <input id="pTitle" placeholder="Facebook page account of 1 year old USA" />
+                    <label>URL link (eye opens this)</label>
+                    <input id="pUrl" placeholder="https://..." />
+                    <label>Account logins</label>
+                    <div id="loginList"></div>
+                    <button type="button" class="btn-out btn-sm" id="btnAddLine">+</button>
+                    <label>Amount ₦</label>
+                    <input type="number" id="pPrice" value="3000" />
+                    <button type="button" class="btn" id="btnSave" style="width:100%;">Save log</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Saved logs</h2>
+            <button type="button" class="btn-out btn-sm" id="btnClearEmpty" style="margin-bottom:10px;">Remove sample /
+                empty logs</button>
+            <button type="button" class="btn-out btn-sm" id="btnDeleteAllLogs"
+                style="margin-bottom:10px;color:#b91c1c;border-color:#b91c1c;">Delete ALL logs</button>
+            <div id="savedList" class="muted">Loading…</div>
+        </div>
+
+        <!-- WORKING PICTURES -->
+        <div class="card">
+            <div class="drop-title" data-drop="wp">Working Pictures <span>▼</span></div>
+            <div class="drop-body" id="drop-wp">
+                <div id="wpForms"></div>
+                <button type="button" class="btn-out" id="btnAddWpPack">+ Add another person / pack</button>
+                <div id="wpSaved" style="margin-top:12px;"></div>
+            </div>
+        </div>
+
+        <!-- TOOLS -->
+        <div class="card">
+            <div class="drop-title" data-drop="tools">Tools <span>▼</span></div>
+            <div class="drop-body" id="drop-tools">
+                <div id="toolsForms"></div>
+                <button type="button" class="btn-out" id="btnAddToolsPack">+ Add another</button>
+                <div id="toolsSaved" style="margin-top:12px;"></div>
+            </div>
+        </div>
+
+        <!-- FORMAT -->
+        <div class="card">
+            <div class="drop-title" data-drop="format">Format <span>▼</span></div>
+            <div class="drop-body" id="drop-format">
+                <div id="formatForms"></div>
+                <button type="button" class="btn-out" id="btnAddFormatPack">+ Add another</button>
+                <div id="formatSaved" style="margin-top:12px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <script>
+        if (!localStorage.getItem('ablogs_token')) location.href = '/login';
+        const token = () => localStorage.getItem('ablogs_token');
+        async function api(path, opts = {}) {
+            const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+            headers.Authorization = 'Bearer ' + token();
+            const res = await fetch(path, Object.assign({}, opts, { headers }));
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Failed');
+            return data;
+        }
+        function toast(m) {
+            const t = document.getElementById('toast');
+            t.textContent = m; t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2400);
+        }
+        document.getElementById('btnLogout').onclick = () => { localStorage.clear(); location.href = '/login'; };
+
+        document.querySelectorAll('.drop-title').forEach((el) => {
+            el.onclick = () => {
+                const body = document.getElementById('drop-' + el.getAttribute('data-drop'));
+                body.classList.toggle('open');
+            };
+        });
+
+        // LOGS
+        let lineCount = 0;
+        function addLine(val) {
+            lineCount++;
+            const row = document.createElement('div');
+            row.className = 'line';
+            row.innerHTML = `<span class="num">${lineCount}.</span><input class="login-line" placeholder="login #${lineCount}" value="${val || ''}" /><button type="button" class="btn-out btn-sm rm">×</button>`;
+            row.querySelector('.rm').onclick = () => { row.remove(); renumber(); };
+            document.getElementById('loginList').appendChild(row);
+        }
+        function renumber() {
+            const rows = document.querySelectorAll('#loginList .line');
+            lineCount = rows.length;
+            rows.forEach((r, i) => { r.querySelector('.num').textContent = (i + 1) + '.'; });
+        }
+        document.getElementById('btnAddLine').onclick = () => addLine('');
+        document.getElementById('pCat').onchange = function () {
+            document.getElementById('customWrap').style.display = this.value === 'add' ? 'block' : 'none';
+            document.getElementById('formBox').style.display = this.value ? 'block' : 'none';
+            if (this.value === 'add') document.getElementById('pCustom').focus();
+            if (this.value && !document.querySelectorAll('#loginList .line').length) {
+                addLine(''); addLine(''); addLine('');
+            }
+        };
+        document.getElementById('pPhoto').onchange = function () {
+            const f = this.files && this.files[0];
+            if (!f) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                const img = document.getElementById('photoPrev');
+                img.src = reader.result; img.style.display = 'inline-block'; img.dataset.data = reader.result;
+            };
+            reader.readAsDataURL(f);
+        };
+        document.getElementById('btnSave').onclick = async () => {
+            try {
+                const lines = Array.from(document.querySelectorAll('.login-line')).map(i => i.value.trim()).filter(Boolean);
+                if (!document.getElementById('pTitle').value.trim()) return toast('Title required');
+                if (!lines.length) return toast('Add logins');
+                const product = await api('/api/admin/products', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        title: document.getElementById('pTitle').value,
+                        category: document.getElementById('pCat').value === 'add'
+                            ? (document.getElementById('pCustom').value.trim() || 'custom')
+                            : document.getElementById('pCat').value,
+                        customCategory: document.getElementById('pCustom').value,
+                        price: document.getElementById('pPrice').value,
+                        image: document.getElementById('photoPrev').dataset.data || '',
+                        viewAccountLink: document.getElementById('pUrl').value
+                    })
+                });
+                const id = product.product._id || product.product.id;
+                await api('/api/admin/products/' + id + '/stock', {
+                    method: 'POST',
+                    body: JSON.stringify({ bulkLogins: lines.join('\n'), previewLink: document.getElementById('pUrl').value })
+                });
+                toast('Saved');
+                document.getElementById('loginList').innerHTML = '';
+                lineCount = 0; addLine(''); addLine(''); addLine('');
+                async function loadSiteStats() {
+                    try {
+                        const d = await api('/api/admin/site-stats');
+                        const n = (x) => '₦' + Number(x || 0).toLocaleString();
+                        const el = (id) => document.getElementById(id);
+                        if (el('siteDepositTotal')) el('siteDepositTotal').textContent = n(d.totalDeposited);
+                        if (el('siteDepositCount')) el('siteDepositCount').textContent = d.depositCount || 0;
+                        if (el('siteUsers')) el('siteUsers').textContent = d.userCount || 0;
+                        if (el('siteOrders')) el('siteOrders').textContent = d.orderCount || 0;
+                        if (el('siteSuccessOrders')) el('siteSuccessOrders').textContent = d.successfulOrders || 0;
+                        if (el('siteFailedOrders')) el('siteFailedOrders').textContent = d.failedOrders || 0;
+                        if (el('sitePendingOrders')) el('sitePendingOrders').textContent = d.pendingOrders || 0;
+                        if (el('siteSuccessRev')) el('siteSuccessRev').textContent = n(d.successfulRevenue) + ' revenue';
+                    } catch (_) { }
+                }
+
+                let activeChatUser = null;
+                async function loadSettingsForm() { /* logo/whatsapp settings removed — edit HTML files directly */ }
+
+                async function loadChatThreads() {
+                    try {
+                        const d = await api('/api/chat/admin/threads');
+                        const box = document.getElementById('chatThreads');
+                        const threads = d.threads || d.items || [];
+                        if (!threads.length) { box.innerHTML = '<span class="muted">No customer chats yet</span>'; return; }
+                        box.innerHTML = threads.map((th) => {
+                            const id = th.userId || th.user || th._id;
+                            const name = th.name || th.userName || th.email || 'Customer';
+                            const preview = th.lastText || th.lastMessage || th.preview || '';
+                            return `<div class="log-row" style="cursor:pointer;" data-uid="${id}" data-name="${name}">
+            <div><strong>${name}</strong><div class="muted">${preview}</div></div>
+            <button type="button" class="btn-out btn-sm">Open</button>
+          </div>`;
+                        }).join('');
+                        box.querySelectorAll('[data-uid]').forEach((row) => {
+                            row.onclick = () => openChat(row.getAttribute('data-uid'), row.getAttribute('data-name'));
+                        });
+                    } catch (e) {
+                        document.getElementById('chatThreads').innerHTML = '<span class="muted">Chat load failed</span>';
+                    }
+                }
+                async function openChat(userId, name) {
+                    activeChatUser = userId;
+                    document.getElementById('chatPanel').style.display = 'block';
+                    document.getElementById('chatWith').textContent = 'Chat with ' + name;
+                    await loadChatMsgs();
+                }
+                async function loadChatMsgs() {
+                    if (!activeChatUser) return;
+                    try {
+                        const d = await api('/api/chat/admin/messages/' + activeChatUser);
+                        const msgs = d.messages || [];
+                        const box = document.getElementById('chatMsgs');
+                        box.innerHTML = msgs.map((m) => {
+                            const mine = m.from === 'admin' || m.fromAdmin;
+                            const align = mine ? 'right' : 'left';
+                            const bg = mine ? '#dbeafe' : '#fff';
+                            let body = m.image ? `<img src="${m.image}" style="max-width:160px;border-radius:8px;" />` : (m.text || m.message || '');
+                            return `<div style="text-align:${align};margin:6px 0;"><span style="display:inline-block;background:${bg};padding:8px 10px;border-radius:10px;max-width:85%;">${body}</span></div>`;
+                        }).join('') || '<span class="muted">No messages</span>';
+                        box.scrollTop = box.scrollHeight;
+                    } catch (_) { }
+                }
+                document.getElementById('btnChatSend').onclick = async () => {
+                    const text = document.getElementById('chatReply').value.trim();
+                    if (!text || !activeChatUser) return;
+                    try {
+                        await api('/api/chat/admin/messages/' + activeChatUser, {
+                            method: 'POST',
+                            body: JSON.stringify({ text })
+                        });
+                        document.getElementById('chatReply').value = '';
+                        loadChatMsgs();
+                    } catch (e) { toast(e.message); }
+                };
+                document.getElementById('chatPhotoAdmin').onchange = async function () {
+                    const f = this.files && this.files[0];
+                    if (!f || !activeChatUser) return;
+                    const reader = new FileReader();
+                    reader.onload = async () => {
+                        try {
+                            await api('/api/chat/admin/messages/' + activeChatUser, {
+                                method: 'POST',
+                                body: JSON.stringify({ text: '', image: reader.result })
+                            });
+                            loadChatMsgs();
+                        } catch (e) { toast(e.message); }
+                    };
+                    reader.readAsDataURL(f);
+                };
+
+                // remove old bell handlers if present
+
+                loadSettingsForm();
+                loadChatThreads();
+                loadSiteStats();
+                loadSaved();
+            } catch (e) { toast(e.message); }
+        };
+
+        async function loadSaved() {
+            const d = await api('/api/admin/products');
+            const box = document.getElementById('savedList');
+            const items = d.products || [];
+            box.innerHTML = items.map(p => {
+                const left = p.stockLeft != null ? p.stockLeft : (p.stock || p.piecesLeft || 0);
+                const id = p.id || p._id;
+                return `
+        <div class="log-row">
+          <div style="display:flex;gap:10px;align-items:center;">
+            ${p.image ? `<img src="${p.image}" style="width:40px;height:40px;object-fit:cover;border-radius:8px;" />` : ''}
+            <div>
+              <strong>${p.title}</strong>
+              <div class="muted">${p.category || 'log'}</div>
+              <div style="font-size:0.9rem;margin-top:2px;">
+                <span style="font-weight:700;">₦${Number(p.price).toLocaleString()}</span>
+                · <span style="color:${left > 0 ? '#16a34a' : '#dc2626'};font-weight:700;">${left} piece${left === 1 ? '' : 's'} left</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn-out btn-sm" data-del="${id}">Delete</button>
+        </div>`;
+            }).join('') || '<span class="muted">No logs yet — use <strong>Add log</strong> above to add texting apps, Gmail, etc.</span>';
+            box.querySelectorAll('[data-del]').forEach(btn => {
+                btn.onclick = async () => {
+                    if (!confirm('Delete?')) return;
+                    await api('/api/admin/products/' + btn.getAttribute('data-del'), { method: 'DELETE' });
+                    async function loadSiteStats() {
+                        try {
+                            const d = await api('/api/admin/site-stats');
+                            document.getElementById('siteDepositTotal').textContent = '₦' + Number(d.totalDeposited || 0).toLocaleString();
+                            document.getElementById('siteDepositCount').textContent = d.depositCount || 0;
+                            document.getElementById('siteUsers').textContent = d.userCount || 0;
+                            document.getElementById('siteOrders').textContent = d.orderCount || 0;
+                        } catch (_) { }
+                    }
+
+                    let activeChatUser = null;
+                    async function loadSettingsForm() { /* logo/whatsapp settings removed — edit HTML files directly */ }
+
+                    async function loadChatThreads() {
+                        try {
+                            const d = await api('/api/chat/admin/threads');
+                            const box = document.getElementById('chatThreads');
+                            const threads = d.threads || d.items || [];
+                            if (!threads.length) { box.innerHTML = '<span class="muted">No customer chats yet</span>'; return; }
+                            box.innerHTML = threads.map((th) => {
+                                const id = th.userId || th.user || th._id;
+                                const name = th.name || th.userName || th.email || 'Customer';
+                                const preview = th.lastText || th.lastMessage || th.preview || '';
+                                return `<div class="log-row" style="cursor:pointer;" data-uid="${id}" data-name="${name}">
+            <div><strong>${name}</strong><div class="muted">${preview}</div></div>
+            <button type="button" class="btn-out btn-sm">Open</button>
+          </div>`;
+                            }).join('');
+                            box.querySelectorAll('[data-uid]').forEach((row) => {
+                                row.onclick = () => openChat(row.getAttribute('data-uid'), row.getAttribute('data-name'));
+                            });
+                        } catch (e) {
+                            document.getElementById('chatThreads').innerHTML = '<span class="muted">Chat load failed</span>';
+                        }
+                    }
+                    async function openChat(userId, name) {
+                        activeChatUser = userId;
+                        document.getElementById('chatPanel').style.display = 'block';
+                        document.getElementById('chatWith').textContent = 'Chat with ' + name;
+                        await loadChatMsgs();
+                    }
+                    async function loadChatMsgs() {
+                        if (!activeChatUser) return;
+                        try {
+                            const d = await api('/api/chat/admin/messages/' + activeChatUser);
+                            const msgs = d.messages || [];
+                            const box = document.getElementById('chatMsgs');
+                            box.innerHTML = msgs.map((m) => {
+                                const mine = m.from === 'admin' || m.fromAdmin;
+                                const align = mine ? 'right' : 'left';
+                                const bg = mine ? '#dbeafe' : '#fff';
+                                let body = m.image ? `<img src="${m.image}" style="max-width:160px;border-radius:8px;" />` : (m.text || m.message || '');
+                                return `<div style="text-align:${align};margin:6px 0;"><span style="display:inline-block;background:${bg};padding:8px 10px;border-radius:10px;max-width:85%;">${body}</span></div>`;
+                            }).join('') || '<span class="muted">No messages</span>';
+                            box.scrollTop = box.scrollHeight;
+                        } catch (_) { }
+                    }
+                    document.getElementById('btnChatSend').onclick = async () => {
+                        const text = document.getElementById('chatReply').value.trim();
+                        if (!text || !activeChatUser) return;
+                        try {
+                            await api('/api/chat/admin/messages/' + activeChatUser, {
+                                method: 'POST',
+                                body: JSON.stringify({ text })
+                            });
+                            document.getElementById('chatReply').value = '';
+                            loadChatMsgs();
+                        } catch (e) { toast(e.message); }
+                    };
+                    document.getElementById('chatPhotoAdmin').onchange = async function () {
+                        const f = this.files && this.files[0];
+                        if (!f || !activeChatUser) return;
+                        const reader = new FileReader();
+                        reader.onload = async () => {
+                            try {
+                                await api('/api/chat/admin/messages/' + activeChatUser, {
+                                    method: 'POST',
+                                    body: JSON.stringify({ text: '', image: reader.result })
+                                });
+                                loadChatMsgs();
+                            } catch (e) { toast(e.message); }
+                        };
+                        reader.readAsDataURL(f);
+                    };
+
+                    // remove old bell handlers if present
+
+                    loadSettingsForm();
+                    loadChatThreads();
+                    loadSiteStats();
+                    loadSaved();
+                };
+            });
+        }
+        document.getElementById('btnClearEmpty').onclick = async () => {
+            try {
+                const r = await api('/api/admin/products/clear-empty', { method: 'POST', body: '{}' });
+                toast('Removed ' + r.removed + ' empty logs');
+                async function loadSiteStats() {
+                    try {
+                        const d = await api('/api/admin/site-stats');
+                        document.getElementById('siteDepositTotal').textContent = '₦' + Number(d.totalDeposited || 0).toLocaleString();
+                        document.getElementById('siteDepositCount').textContent = d.depositCount || 0;
+                        document.getElementById('siteUsers').textContent = d.userCount || 0;
+                        document.getElementById('siteOrders').textContent = d.orderCount || 0;
+                    } catch (_) { }
+                }
+
+                let activeChatUser = null;
+                async function loadSettingsForm() { /* logo/whatsapp settings removed — edit HTML files directly */ }
+
+                async function loadChatThreads() {
+                    try {
+                        const d = await api('/api/chat/admin/threads');
+                        const box = document.getElementById('chatThreads');
+                        const threads = d.threads || d.items || [];
+                        if (!threads.length) { box.innerHTML = '<span class="muted">No customer chats yet</span>'; return; }
+                        box.innerHTML = threads.map((th) => {
+                            const id = th.userId || th.user || th._id;
+                            const name = th.name || th.userName || th.email || 'Customer';
+                            const preview = th.lastText || th.lastMessage || th.preview || '';
+                            return `<div class="log-row" style="cursor:pointer;" data-uid="${id}" data-name="${name}">
+            <div><strong>${name}</strong><div class="muted">${preview}</div></div>
+            <button type="button" class="btn-out btn-sm">Open</button>
+          </div>`;
+                        }).join('');
+                        box.querySelectorAll('[data-uid]').forEach((row) => {
+                            row.onclick = () => openChat(row.getAttribute('data-uid'), row.getAttribute('data-name'));
+                        });
+                    } catch (e) {
+                        document.getElementById('chatThreads').innerHTML = '<span class="muted">Chat load failed</span>';
+                    }
+                }
+                async function openChat(userId, name) {
+                    activeChatUser = userId;
+                    document.getElementById('chatPanel').style.display = 'block';
+                    document.getElementById('chatWith').textContent = 'Chat with ' + name;
+                    await loadChatMsgs();
+                }
+                async function loadChatMsgs() {
+                    if (!activeChatUser) return;
+                    try {
+                        const d = await api('/api/chat/admin/messages/' + activeChatUser);
+                        const msgs = d.messages || [];
+                        const box = document.getElementById('chatMsgs');
+                        box.innerHTML = msgs.map((m) => {
+                            const mine = m.from === 'admin' || m.fromAdmin;
+                            const align = mine ? 'right' : 'left';
+                            const bg = mine ? '#dbeafe' : '#fff';
+                            let body = m.image ? `<img src="${m.image}" style="max-width:160px;border-radius:8px;" />` : (m.text || m.message || '');
+                            return `<div style="text-align:${align};margin:6px 0;"><span style="display:inline-block;background:${bg};padding:8px 10px;border-radius:10px;max-width:85%;">${body}</span></div>`;
+                        }).join('') || '<span class="muted">No messages</span>';
+                        box.scrollTop = box.scrollHeight;
+                    } catch (_) { }
+                }
+                document.getElementById('btnChatSend').onclick = async () => {
+                    const text = document.getElementById('chatReply').value.trim();
+                    if (!text || !activeChatUser) return;
+                    try {
+                        await api('/api/chat/admin/messages/' + activeChatUser, {
+                            method: 'POST',
+                            body: JSON.stringify({ text })
+                        });
+                        document.getElementById('chatReply').value = '';
+                        loadChatMsgs();
+                    } catch (e) { toast(e.message); }
+                };
+                document.getElementById('chatPhotoAdmin').onchange = async function () {
+                    const f = this.files && this.files[0];
+                    if (!f || !activeChatUser) return;
+                    const reader = new FileReader();
+                    reader.onload = async () => {
+                        try {
+                            await api('/api/chat/admin/messages/' + activeChatUser, {
+                                method: 'POST',
+                                body: JSON.stringify({ text: '', image: reader.result })
+                            });
+                            loadChatMsgs();
+                        } catch (e) { toast(e.message); }
+                    };
+                    reader.readAsDataURL(f);
+                };
+
+                // remove old bell handlers if present
+
+                loadSettingsForm();
+                loadChatThreads();
+                loadSiteStats();
+                loadSaved();
+            } catch (e) { toast(e.message); }
+        };
+
+        // Pack form builder (WP / tools / format) — up to 3 photos
+        function packFormHtml(kind, idx) {
+            return `<div class="pack-form" data-kind="${kind}" style="border:1px dashed #e5e7eb;border-radius:12px;padding:12px;margin-bottom:12px;">
+        <label>Photos (up to 3)</label>
+        <input type="file" class="pk-photos" accept="image/*" multiple />
+        <div class="pk-previews" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;"></div>
+        <label>Free text / title</label>
+        <input class="pk-title" placeholder="Anything you want to write" />
+        <label>URL link (after buy)</label>
+        <input class="pk-url" placeholder="https://t.me/... or any link" />
+        <label>Amount ₦</label>
+        <input type="number" class="pk-price" value="3000" />
+        <button type="button" class="btn pk-save" style="width:100%;">Save this pack</button>
+      </div>`;
+        }
+        function wirePackForm(container) {
+            container.querySelectorAll('.pack-form').forEach((form) => {
+                if (form.dataset.wired) return;
+                form.dataset.wired = '1';
+                const previews = [];
+                form.querySelector('.pk-photos').onchange = function () {
+                    const files = Array.from(this.files || []).slice(0, 3);
+                    const box = form.querySelector('.pk-previews');
+                    box.innerHTML = '';
+                    previews.length = 0;
+                    files.forEach((f) => {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            previews.push(reader.result);
+                            const img = document.createElement('img');
+                            img.src = reader.result; img.className = 'preview'; img.style.display = 'block';
+                            box.appendChild(img);
+                        };
+                        reader.readAsDataURL(f);
+                    });
+                    form._previews = previews;
+                };
+                form.querySelector('.pk-save').onclick = async () => {
+                    try {
+                        const kind = form.getAttribute('data-kind');
+                        const title = form.querySelector('.pk-title').value.trim();
+                        const url = form.querySelector('.pk-url').value.trim();
+                        const price = form.querySelector('.pk-price').value;
+                        if (!title) return toast('Write a title');
+                        const imgs = form._previews || [];
+                        await api('/api/admin/working-pictures', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                kind,
+                                title,
+                                price,
+                                telegramLink: url,
+                                previewImages: imgs,
+                                coverImage: imgs[0] || '',
+                                picturesCount: imgs.length
+                            })
+                        });
+                        toast('Pack saved');
+                        loadPacks(kind);
+                    } catch (e) { toast(e.message); }
+                };
+            });
+        }
+        function addPackForm(kind) {
+            const map = { working: 'wpForms', tools: 'toolsForms', format: 'formatForms' };
+            const el = document.getElementById(map[kind]);
+            el.insertAdjacentHTML('beforeend', packFormHtml(kind));
+            wirePackForm(el);
+        }
+        document.getElementById('btnAddWpPack').onclick = () => addPackForm('working');
+        document.getElementById('btnAddToolsPack').onclick = () => addPackForm('tools');
+        document.getElementById('btnAddFormatPack').onclick = () => addPackForm('format');
+        addPackForm('working'); addPackForm('tools'); addPackForm('format');
+
+        async function loadPacks(kind) {
+            const d = await api('/api/admin/working-pictures');
+            const items = (d.items || []).filter((i) => (i.kind || 'working') === kind);
+            const map = { working: 'wpSaved', tools: 'toolsSaved', format: 'formatSaved' };
+            const box = document.getElementById(map[kind]);
+            box.innerHTML = items.map((it) => `
+        <div class="log-row">
+          <div><strong>${it.title}</strong><div class="muted">₦${Number(it.price).toLocaleString()}</div></div>
+          <button type="button" class="btn-out btn-sm" data-wpdel="${it._id}">Delete</button>
+        </div>`).join('') || '<span class="muted">None yet</span>';
+            box.querySelectorAll('[data-wpdel]').forEach((btn) => {
+                btn.onclick = async () => {
+                    await api('/api/admin/working-pictures/' + btn.getAttribute('data-wpdel'), { method: 'DELETE' });
+                    loadPacks(kind);
+                };
+            });
+        }
+
+
+        async function loadSiteStats() {
+            try {
+                const d = await api('/api/admin/site-stats');
+                document.getElementById('siteDepositTotal').textContent = '₦' + Number(d.totalDeposited || 0).toLocaleString();
+                document.getElementById('siteDepositCount').textContent = d.depositCount || 0;
+                document.getElementById('siteUsers').textContent = d.userCount || 0;
+                document.getElementById('siteOrders').textContent = d.orderCount || 0;
+            } catch (_) { }
+        }
+
+        let activeChatUser = null;
+        async function loadSettingsForm() { /* logo/whatsapp settings removed — edit HTML files directly */ }
+
+        async function loadChatThreads() {
+            try {
+                const d = await api('/api/chat/admin/threads');
+                const box = document.getElementById('chatThreads');
+                const threads = d.threads || d.items || [];
+                if (!threads.length) { box.innerHTML = '<span class="muted">No customer chats yet</span>'; return; }
+                box.innerHTML = threads.map((th) => {
+                    const id = th.userId || th.user || th._id;
+                    const name = th.name || th.userName || th.email || 'Customer';
+                    const preview = th.lastText || th.lastMessage || th.preview || '';
+                    return `<div class="log-row" style="cursor:pointer;" data-uid="${id}" data-name="${name}">
+            <div><strong>${name}</strong><div class="muted">${preview}</div></div>
+            <button type="button" class="btn-out btn-sm">Open</button>
+          </div>`;
+                }).join('');
+                box.querySelectorAll('[data-uid]').forEach((row) => {
+                    row.onclick = () => openChat(row.getAttribute('data-uid'), row.getAttribute('data-name'));
+                });
+            } catch (e) {
+                document.getElementById('chatThreads').innerHTML = '<span class="muted">Chat load failed</span>';
+            }
+        }
+        async function openChat(userId, name) {
+            activeChatUser = userId;
+            document.getElementById('chatPanel').style.display = 'block';
+            document.getElementById('chatWith').textContent = 'Chat with ' + name;
+            await loadChatMsgs();
+        }
+        async function loadChatMsgs() {
+            if (!activeChatUser) return;
+            try {
+                const d = await api('/api/chat/admin/messages/' + activeChatUser);
+                const msgs = d.messages || [];
+                const box = document.getElementById('chatMsgs');
+                box.innerHTML = msgs.map((m) => {
+                    const mine = m.from === 'admin' || m.fromAdmin;
+                    const align = mine ? 'right' : 'left';
+                    const bg = mine ? '#dbeafe' : '#fff';
+                    let body = m.image ? `<img src="${m.image}" style="max-width:160px;border-radius:8px;" />` : (m.text || m.message || '');
+                    return `<div style="text-align:${align};margin:6px 0;"><span style="display:inline-block;background:${bg};padding:8px 10px;border-radius:10px;max-width:85%;">${body}</span></div>`;
+                }).join('') || '<span class="muted">No messages</span>';
+                box.scrollTop = box.scrollHeight;
+            } catch (_) { }
+        }
+        document.getElementById('btnChatSend').onclick = async () => {
+            const text = document.getElementById('chatReply').value.trim();
+            if (!text || !activeChatUser) return;
+            try {
+                await api('/api/chat/admin/messages/' + activeChatUser, {
+                    method: 'POST',
+                    body: JSON.stringify({ text })
+                });
+                document.getElementById('chatReply').value = '';
+                loadChatMsgs();
+            } catch (e) { toast(e.message); }
+        };
+        document.getElementById('chatPhotoAdmin').onchange = async function () {
+            const f = this.files && this.files[0];
+            if (!f || !activeChatUser) return;
+            const reader = new FileReader();
+            reader.onload = async () => {
+                try {
+                    await api('/api/chat/admin/messages/' + activeChatUser, {
+                        method: 'POST',
+                        body: JSON.stringify({ text: '', image: reader.result })
+                    });
+                    loadChatMsgs();
+                } catch (e) { toast(e.message); }
+            };
+            reader.readAsDataURL(f);
+        };
+
+        // remove old bell handlers if present
+
+        loadSettingsForm();
+        loadChatThreads();
+        loadSiteStats();
+        loadSaved();
+        loadPacks('working'); loadPacks('tools'); loadPacks('format');
+    </script>
+</body>
+
+</html>
