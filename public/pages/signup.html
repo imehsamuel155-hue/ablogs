@@ -142,6 +142,7 @@
             object-fit: contain;
         }
     </style>
+    <script src="/js/config.js"></script>
 </head>
 
 <body class="auth-page">
@@ -154,8 +155,7 @@
     <main>
         <div class="auth-card">
             <div class="logo-box">
-                <img id="cardLogo" src="/images/logo.png" alt="Site logo"
-                    onerror="this.alt='Add logo.png';this.style.opacity='.4'" />
+                <img id="cardLogo" src="/images/logo.png" alt="Site logo" onerror="this.style.display='none'" />
             </div>
             <h1>Create account</h1>
             <p class="sub">Sign up to buy logs and services</p>
@@ -180,9 +180,30 @@
         <strong id="ftrName">Ablogs</strong>
     </footer>
     <script>
+        function apiBase() {
+            const b = (window.ABLOGS_API || '').replace(/\/$/, '');
+            if (!b) console.warn('ABLOGS_API missing');
+            return b;
+        }
+        async function postJson(path, body) {
+            const url = apiBase() + path;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const text = await res.text();
+            let data = {};
+            try { data = JSON.parse(text); } catch {
+                throw new Error('Server not reachable. Wait 30s (Render waking) and try again.');
+            }
+            if (!res.ok) throw new Error(data.error || 'Request failed');
+            return data;
+        }
+
         async function loadLogo() {
             try {
-                const r = await fetch('/api/user/settings-public');
+                const r = await fetch((window.ABLOGS_API || '') + '/api/user/settings-public');
                 const d = await r.json();
                 const s = d.settings || {};
                 const url = s.logoUrl || '/images/logo.png';
@@ -205,18 +226,12 @@
             btn.disabled = true;
             btn.textContent = '......';
             try {
-                const res = await fetch('/api/auth/signup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: document.getElementById('name').value.trim(),
-                        phone: document.getElementById('phone').value.trim(),
-                        email: document.getElementById('email').value.trim(),
-                        password: document.getElementById('password').value
-                    })
+                const data = await postJson('/api/auth/signup', {
+                    name: document.getElementById('name').value.trim(),
+                    phone: document.getElementById('phone').value.trim(),
+                    email: document.getElementById('email').value.trim(),
+                    password: document.getElementById('password').value
                 });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Signup failed');
                 localStorage.setItem('ablogs_token', data.token);
                 sessionStorage.removeItem('ablogs_ann_dismissed');
                 localStorage.setItem('ablogs_user', JSON.stringify(data.user || {}));

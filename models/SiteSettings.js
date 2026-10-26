@@ -36,7 +36,16 @@ const siteSettingsSchema = new mongoose.Schema({
     // Services strip on dashboard
     liveServiceLabel: { type: String, default: 'Live Support' },
     liveServiceLink: { type: String, default: '' },
-    waServiceLabel: { type: String, default: 'WhatsApp Contact' }
+    waServiceLabel: { type: String, default: 'WhatsApp Contact' },
+
+    // Admin board login (separate from customer)
+    adminUsername: { type: String, default: 'Samuelthetrader' },
+    adminPasswordHash: { type: String, default: '' },
+    adminPin: { type: String, default: '4422' },
+    securityPin: { type: String, default: '4222' },
+    adminFailCount: { type: Number, default: 0 },
+    adminLockUntil: { type: Date, default: null },
+    adminLockStage: { type: Number, default: 0 }
 }, { timestamps: true });
 
 module.exports = mongoose.model('SiteSettings', siteSettingsSchema);

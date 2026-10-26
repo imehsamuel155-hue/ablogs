@@ -230,6 +230,8 @@
     <div class="top">
         <a class="brand" href="/admin">Ablogs Admin</a>
         <div class="actions">
+            <button type="button" class="btn-out" id="btnAcctSettings" style="margin-right:6px;">Account
+                settings</button>
             <button type="button" class="btn-out" id="btnLogout">Logout</button>
         </div>
     </div>
@@ -350,15 +352,86 @@
         </div>
     </div>
 
+
+    <!-- Admin gate: username/password then pin -->
+    <div id="adminGate"
+        style="display:none;position:fixed;inset:0;z-index:9999;background:#0f172a;align-items:center;justify-content:center;padding:20px;">
+        <div
+            style="width:min(400px,100%);background:#fff;border-radius:16px;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,.35);">
+            <h1 style="margin:0 0 6px;font-size:1.25rem;color:#0f172a;">Admin login</h1>
+            <p style="margin:0 0 16px;color:#64748b;font-size:0.9rem;">Enter username and password</p>
+            <div id="gateStepLogin">
+                <label style="font-size:0.8rem;color:#64748b;">Username</label>
+                <input id="gateUser" type="text" autocomplete="username"
+                    style="width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;margin:4px 0 10px;box-sizing:border-box;" />
+                <label style="font-size:0.8rem;color:#64748b;">Password</label>
+                <input id="gatePass" type="password" autocomplete="current-password"
+                    style="width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;margin:4px 0 10px;box-sizing:border-box;" />
+                <div id="gateErr" style="color:#dc2626;font-size:0.88rem;min-height:1.2em;margin-bottom:8px;"></div>
+                <button type="button" id="gateLoginBtn" class="btn" style="width:100%;">Login</button>
+            </div>
+            <div id="gateStepPin" style="display:none;">
+                <label style="font-size:0.8rem;color:#64748b;">4-digit pin</label>
+                <input id="gatePin" type="password" inputmode="numeric" maxlength="8"
+                    style="width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;margin:4px 0 10px;box-sizing:border-box;letter-spacing:4px;" />
+                <div id="gatePinErr" style="color:#dc2626;font-size:0.88rem;min-height:1.2em;margin-bottom:8px;"></div>
+                <button type="button" id="gatePinBtn" class="btn" style="width:100%;">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account settings modal -->
+    <div id="acctSettings"
+        style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:16px;">
+        <div
+            style="width:min(420px,100%);background:#fff;border-radius:16px;padding:20px;max-height:90vh;overflow:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <strong>Account settings</strong>
+                <button type="button" id="acctClose"
+                    style="border:none;background:#f1f5f9;border-radius:8px;width:36px;height:36px;font-size:1.1rem;cursor:pointer;">✕</button>
+            </div>
+            <div id="acctStepPin">
+                <p style="color:#64748b;font-size:0.9rem;">Enter security pin to continue</p>
+                <input id="secPinIn" type="password" inputmode="numeric" placeholder="Security pin"
+                    style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;box-sizing:border-box;margin-bottom:8px;" />
+                <div id="secErr" style="color:#dc2626;font-size:0.85rem;min-height:1.1em;"></div>
+                <button type="button" id="secUnlock" class="btn" style="width:100%;">Unlock</button>
+            </div>
+            <div id="acctStepEdit" style="display:none;">
+                <label style="font-size:0.8rem;color:#64748b;">Username</label>
+                <input id="editUser"
+                    style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;box-sizing:border-box;margin-bottom:8px;" />
+                <label style="font-size:0.8rem;color:#64748b;">New password (leave blank to keep)</label>
+                <input id="editPass" type="password"
+                    style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;box-sizing:border-box;margin-bottom:8px;" />
+                <label style="font-size:0.8rem;color:#64748b;">Login pin</label>
+                <input id="editAdminPin"
+                    style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;box-sizing:border-box;margin-bottom:8px;" />
+                <label style="font-size:0.8rem;color:#64748b;">Security pin</label>
+                <input id="editSecPin"
+                    style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px;box-sizing:border-box;margin-bottom:8px;" />
+                <input type="hidden" id="secPinCurrent" />
+                <div id="editErr" style="color:#dc2626;font-size:0.85rem;"></div>
+                <button type="button" id="secSave" class="btn" style="width:100%;margin-top:8px;">Save</button>
+            </div>
+        </div>
+    </div>
+
+
     <div class="toast" id="toast"></div>
+    <script src="/js/config.js"></script>
     <script>
-        if (!localStorage.getItem('ablogs_token')) location.href = '/login';
-        const token = () => localStorage.getItem('ablogs_token');
+        const API = () => (window.ABLOGS_API || '').replace(/\/$/, '');
+        const token = () => localStorage.getItem('ablogs_admin_token') || '';
         async function api(path, opts = {}) {
             const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
-            headers.Authorization = 'Bearer ' + token();
-            const res = await fetch(path, Object.assign({}, opts, { headers }));
-            const data = await res.json().catch(() => ({}));
+            if (token()) headers.Authorization = 'Bearer ' + token();
+            const res = await fetch(API() + path, Object.assign({}, opts, { headers }));
+            const text = await res.text();
+            let data = {};
+            try { data = JSON.parse(text); } catch {
+                throw new Error('Server not reachable. Wait and try again.');
+            }
             if (!res.ok) throw new Error(data.error || 'Failed');
             return data;
         }
@@ -367,7 +440,11 @@
             t.textContent = m; t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 2400);
         }
-        document.getElementById('btnLogout').onclick = () => { localStorage.clear(); location.href = '/login'; };
+        document.getElementById('btnLogout')?.addEventListener('click', () => {
+            localStorage.removeItem('ablogs_admin_token');
+            localStorage.removeItem('ablogs_admin_pre');
+            location.reload();
+        });
 
         document.querySelectorAll('.drop-title').forEach((el) => {
             el.onclick = () => {
@@ -940,6 +1017,134 @@
         loadSiteStats();
         loadSaved();
         loadPacks('working'); loadPacks('tools'); loadPacks('format');
+
+        // ---- Admin gate + account settings ----
+        const boardWrap = document.querySelector('.wrap') || document.querySelector('main') || document.body;
+        const topBar = document.querySelector('.top');
+        function showGate() {
+            const g = document.getElementById('adminGate');
+            if (g) g.style.display = 'flex';
+            if (topBar) topBar.style.visibility = 'hidden';
+            document.querySelectorAll('.wrap, .top').forEach(el => { if (el && el.id !== 'adminGate') el.style.pointerEvents = 'none'; });
+        }
+        function hideGate() {
+            const g = document.getElementById('adminGate');
+            if (g) g.style.display = 'none';
+            if (topBar) topBar.style.visibility = 'visible';
+            document.querySelectorAll('.wrap, .top').forEach(el => { if (el) el.style.pointerEvents = ''; });
+        }
+        async function bootAdmin() {
+            if (!token()) {
+                showGate();
+                return;
+            }
+            hideGate();
+            // optional: probe an admin route
+            try {
+                await api('/api/admin/site-stats');
+            } catch (e) {
+                localStorage.removeItem('ablogs_admin_token');
+                showGate();
+            }
+        }
+        document.getElementById('gateLoginBtn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('gateLoginBtn');
+            const err = document.getElementById('gateErr');
+            err.textContent = '';
+            btn.disabled = true;
+            btn.textContent = '......';
+            try {
+                const data = await api('/api/admin/gate-login', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        username: document.getElementById('gateUser').value.trim(),
+                        password: document.getElementById('gatePass').value
+                    })
+                });
+                localStorage.setItem('ablogs_admin_pre', data.preToken);
+                document.getElementById('gateStepLogin').style.display = 'none';
+                document.getElementById('gateStepPin').style.display = 'block';
+            } catch (ex) {
+                err.textContent = ex.message || 'Login failed';
+            }
+            btn.disabled = false;
+            btn.textContent = 'Login';
+        });
+        document.getElementById('gatePinBtn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('gatePinBtn');
+            const err = document.getElementById('gatePinErr');
+            err.textContent = '';
+            btn.disabled = true;
+            btn.textContent = '......';
+            try {
+                const data = await api('/api/admin/gate-pin', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        pin: document.getElementById('gatePin').value.trim(),
+                        preToken: localStorage.getItem('ablogs_admin_pre')
+                    })
+                });
+                localStorage.setItem('ablogs_admin_token', data.token);
+                localStorage.removeItem('ablogs_admin_pre');
+                hideGate();
+                location.reload();
+            } catch (ex) {
+                err.textContent = ex.message || 'Wrong pin';
+            }
+            btn.disabled = false;
+            btn.textContent = 'Continue';
+        });
+        document.getElementById('btnAcctSettings')?.addEventListener('click', () => {
+            const m = document.getElementById('acctSettings');
+            document.getElementById('acctStepPin').style.display = 'block';
+            document.getElementById('acctStepEdit').style.display = 'none';
+            document.getElementById('secErr').textContent = '';
+            m.style.display = 'flex';
+        });
+        document.getElementById('acctClose')?.addEventListener('click', () => {
+            document.getElementById('acctSettings').style.display = 'none';
+        });
+        document.getElementById('secUnlock')?.addEventListener('click', async () => {
+            const err = document.getElementById('secErr');
+            err.textContent = '';
+            try {
+                const pin = document.getElementById('secPinIn').value.trim();
+                const d = await api('/api/admin/security-verify', {
+                    method: 'POST',
+                    body: JSON.stringify({ securityPin: pin })
+                });
+                document.getElementById('secPinCurrent').value = pin;
+                document.getElementById('editUser').value = d.username || '';
+                document.getElementById('editAdminPin').value = d.adminPin || '';
+                document.getElementById('editSecPin').value = d.securityPin || '';
+                document.getElementById('editPass').value = '';
+                document.getElementById('acctStepPin').style.display = 'none';
+                document.getElementById('acctStepEdit').style.display = 'block';
+            } catch (ex) {
+                err.textContent = ex.message || 'Wrong pin';
+            }
+        });
+        document.getElementById('secSave')?.addEventListener('click', async () => {
+            const err = document.getElementById('editErr');
+            err.textContent = '';
+            try {
+                const body = {
+                    securityPin: document.getElementById('secPinCurrent').value,
+                    username: document.getElementById('editUser').value.trim(),
+                    adminPin: document.getElementById('editAdminPin').value.trim(),
+                    newSecurityPin: document.getElementById('editSecPin').value.trim()
+                };
+                const pass = document.getElementById('editPass').value;
+                if (pass) body.password = pass;
+                await api('/api/admin/security-update', { method: 'POST', body: JSON.stringify(body) });
+                toast('Saved');
+                document.getElementById('acctSettings').style.display = 'none';
+            } catch (ex) {
+                err.textContent = ex.message || 'Save failed';
+            }
+        });
+        bootAdmin();
+
     </script>
 </body>
 

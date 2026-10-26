@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
@@ -57,6 +58,173 @@ function logoFromName(name) {
     }
     return 'https://logo.clearbit.com/' + domain;
 }
+
+
+async function getAdminSettings() {
+    let s = await SiteSettings.findOne({ key: 'main' });
+    if (!s) s = await SiteSettings.create({ key: 'main' });
+    if (!s.adminPasswordHash) {
+        s.adminPasswordHash = await bcrypt.hash('jerofx', 10);
+        s.adminUsername = s.adminUsername || 'Samuelthetrader';
+        s.adminPin = s.adminPin || '4422';
+        s.securityPin = s.securityPin || '4222';
+        await s.save();
+    }
+    return s;
+}
+
+function lockMinutesForStage(stage) {
+    // stage 0 before first lock: 5 tries then 30m
+    // stage 1: 3 tries then 60m
+    // stage 2+: 1 try then 60m
+    if (stage <= 0) return 30;
+    return 60;
+}
+function maxTriesForStage(stage) {
+    if (stage <= 0) return 5;
+    if (stage === 1) return 3;
+    return 1;
+}
+
+/** Public: admin username+password */
+router.post('/gate-login', async (req, res) => {
+    try {
+        const s = await getAdminSettings();
+        const now = new Date();
+        if (s.adminLockUntil && s.adminLockUntil > now) {
+            const mins = Math.ceil((s.adminLockUntil - now) / 60000);
+            return res.status(429).json({
+                error: 'Too many failed attempts. Try again in ' + mins + ' minute(s).',
+                lockUntil: s.adminLockUntil,
+                cooldownMinutes: mins
+            });
+        }
+        const username = String(req.body.username || '').trim();
+        const password = String(req.body.password || '');
+        const okUser = username.toLowerCase() === String(s.adminUsername || '').toLowerCase();
+        const okPass = await bcrypt.compare(password, s.adminPasswordHash || '');
+        if (!okUser || !okPass) {
+            const stage = s.adminLockStage || 0;
+            const maxT = maxTriesForStage(stage);
+            s.adminFailCount = (s.adminFailCount || 0) + 1;
+            if (s.adminFailCount >= maxT) {
+                const mins = lockMinutesForStage(stage);
+                s.adminLockUntil = new Date(Date.now() + mins * 60 * 1000);
+                s.adminFailCount = 0;
+                s.adminLockStage = stage + 1;
+                await s.save();
+                return res.status(429).json({
+                    error: 'Too many failed attempts. Locked for ' + mins + ' minute(s).',
+                    cooldownMinutes: mins
+                });
+            }
+            await s.save();
+            const left = maxT - s.adminFailCount;
+            return res.status(401).json({ error: 'Invalid username or password. ' + left + ' attempt(s) left.' });
+        }
+        // success password — reset fail count but keep stage until full success with pin
+        s.adminFailCount = 0;
+        await s.save();
+        const preToken = jwt.sign(
+            { role: 'admin-pre', step: 'pin' },
+            process.env.JWT_SECRET || 'ablogs_dev_secret',
+            { expiresIn: '10m' }
+        );
+        res.json({ ok: true, needPin: true, preToken });
+    } catch (e) {
+        res.status(500).json({ error: e.message || 'Login failed' });
+    }
+});
+
+/** Public: admin pin after password */
+router.post('/gate-pin', async (req, res) => {
+    try {
+        const pre = req.body.preToken;
+        if (!pre) return res.status(401).json({ error: 'Session expired. Login again.' });
+        let payload;
+        try {
+            payload = jwt.verify(pre, process.env.JWT_SECRET || 'ablogs_dev_secret');
+        } catch {
+            return res.status(401).json({ error: 'Session expired. Login again.' });
+        }
+        if (payload.role !== 'admin-pre') return res.status(401).json({ error: 'Invalid session' });
+
+        const s = await getAdminSettings();
+        const now = new Date();
+        if (s.adminLockUntil && s.adminLockUntil > now) {
+            const mins = Math.ceil((s.adminLockUntil - now) / 60000);
+            return res.status(429).json({ error: 'Locked. Try again in ' + mins + ' minute(s).', cooldownMinutes: mins });
+        }
+        const pin = String(req.body.pin || '').trim();
+        if (pin !== String(s.adminPin || '4422')) {
+            const stage = s.adminLockStage || 0;
+            const maxT = maxTriesForStage(stage);
+            s.adminFailCount = (s.adminFailCount || 0) + 1;
+            if (s.adminFailCount >= maxT) {
+                const mins = lockMinutesForStage(stage);
+                s.adminLockUntil = new Date(Date.now() + mins * 60 * 1000);
+                s.adminFailCount = 0;
+                s.adminLockStage = stage + 1;
+                await s.save();
+                return res.status(429).json({ error: 'Wrong pin. Locked for ' + mins + ' minute(s).', cooldownMinutes: mins });
+            }
+            await s.save();
+            const left = maxT - s.adminFailCount;
+            return res.status(401).json({ error: 'Wrong pin. ' + left + ' attempt(s) left.' });
+        }
+        s.adminFailCount = 0;
+        s.adminLockStage = 0;
+        s.adminLockUntil = null;
+        await s.save();
+        const token = jwt.sign(
+            { role: 'admin', id: 'admin-board' },
+            process.env.JWT_SECRET || 'ablogs_dev_secret',
+            { expiresIn: '12h' }
+        );
+        res.json({ ok: true, token });
+    } catch (e) {
+        res.status(500).json({ error: e.message || 'Pin failed' });
+    }
+});
+
+/** Security pin check before account settings */
+router.post('/security-verify', adminAuth, async (req, res) => {
+    try {
+        const s = await getAdminSettings();
+        const pin = String(req.body.securityPin || '').trim();
+        if (pin !== String(s.securityPin || '4222')) {
+            return res.status(401).json({ error: 'Wrong security pin' });
+        }
+        res.json({
+            ok: true,
+            username: s.adminUsername,
+            adminPin: s.adminPin,
+            securityPin: s.securityPin
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/** Update admin username / password / pins after security pin */
+router.post('/security-update', adminAuth, async (req, res) => {
+    try {
+        const s = await getAdminSettings();
+        const pin = String(req.body.securityPin || '').trim();
+        if (pin !== String(s.securityPin || '4222')) {
+            return res.status(401).json({ error: 'Wrong security pin' });
+        }
+        if (req.body.username) s.adminUsername = String(req.body.username).trim();
+        if (req.body.password) s.adminPasswordHash = await bcrypt.hash(String(req.body.password), 10);
+        if (req.body.adminPin) s.adminPin = String(req.body.adminPin).trim();
+        if (req.body.newSecurityPin) s.securityPin = String(req.body.newSecurityPin).trim();
+        await s.save();
+        res.json({ ok: true, message: 'Saved' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 
 router.get('/products', adminAuth, async (req, res) => {
     try {
