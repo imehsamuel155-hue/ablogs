@@ -23,7 +23,7 @@ const pages = path.join(__dirname, 'public', 'pages');
 
 app.use(cors());
 app.use(morgan('dev'));
-app.use(express.json({ limit: '8mb' }));
+app.use(express.json({ limit: '25mb' }));
 
 app.use('/css', express.static(path.join(__dirname, 'public', 'css')));
 app.use('/js', express.static(path.join(__dirname, 'public', 'js')));

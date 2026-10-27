@@ -368,8 +368,8 @@ const Market = (function () {
                         cats = [...new Set([...cats, ...meta.categories])];
                     }
                 } catch (_) { }
-                cats.sort((a, b) => String(a).localeCompare(String(b)));
-                // rebuild options
+                cats = cats.map((c) => String(c).trim()).filter(Boolean);
+                cats.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
                 sel.innerHTML = '<option value="">All categories</option>';
                 cats.forEach((c) => {
                     const o = document.createElement('option');
@@ -377,10 +377,10 @@ const Market = (function () {
                     o.textContent = c.charAt(0).toUpperCase() + c.slice(1);
                     sel.appendChild(o);
                 });
-                sel.addEventListener('change', () => {
-                    const c = sel.value.toLowerCase();
+                sel.onchange = () => {
+                    const c = (sel.value || '').toLowerCase();
                     renderLogCards(c ? all.filter((p) => (p.category || '').toLowerCase() === c) : all, grid);
-                });
+                };
             }
             document.getElementById('searchCat')?.addEventListener('input', (e) => {
                 const q = e.target.value.toLowerCase();
@@ -391,7 +391,7 @@ const Market = (function () {
                 renderLogCards(list, grid);
             });
         } catch (e) {
-            if (grid) grid.innerHTML = '<p class="muted">Could not load</p>';
+            if (grid) grid.innerHTML = '<p class="muted">Could not load logs. Check connection.</p>';
         }
     }
 
@@ -618,57 +618,8 @@ const Market = (function () {
     }
 
     async function initWorkingPictures() {
-        if (!requireAuth()) return;
-        wireDrawer(); wireChat();
-        let balance = 0;
-        try {
-            const dash = await api('/api/user/dashboard');
-            balance = Number(dash.user.balance || 0);
-        } catch (_) { }
-        const grid = document.getElementById('wpGrid');
-        try {
-            const d = await api('/api/user/working-pictures');
-            if (!grid) return;
-            grid.innerHTML = (d.items || []).map((it) => {
-                const previews = (it.previewImages && it.previewImages.length)
-                    ? it.previewImages
-                    : (it.coverImage ? [it.coverImage] : []);
-                return `
-        <div class="list-card" style="padding:12px;margin-bottom:12px;">
-          <div style="display:flex;gap:6px;overflow-x:auto;">
-            ${previews.map((src) =>
-                    `<img src="${escape(src)}" style="width:100px;height:100px;object-fit:cover;border-radius:10px;cursor:pointer;" onclick="window.open(this.src,'_blank')" />`
-                ).join('') || '<div class="muted">No preview</div>'}
-          </div>
-          <h3 style="margin:10px 0 4px;">${escape(it.title)}</h3>
-          <div class="muted" style="font-size:0.85rem;">${escape(it.gender || '')} · ${it.picturesCount || 0} pics · ${it.videosCount || 0} videos</div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
-            <strong>${money(it.price)}</strong>
-            <button type="button" class="btn btn-red btn-wp-buy" data-id="${it._id}" data-price="${it.price}">Purchase</button>
-          </div>
-        </div>`;
-            }).join('') || '<p class="muted">No packs yet — admin must Save this pack first</p>';
-            grid.querySelectorAll('.btn-wp-buy').forEach((btn) => {
-                btn.addEventListener('click', async () => {
-                    if (balance < Number(btn.getAttribute('data-price'))) {
-                        return toast('Please fund your account. Your balance is not enough.');
-                    }
-                    const old = btn.textContent;
-                    btn.disabled = true; btn.textContent = '......';
-                    try {
-                        const r = await api('/api/user/working-pictures/buy', {
-                            method: 'POST',
-                            body: JSON.stringify({ id: btn.getAttribute('data-id') })
-                        });
-                        balance = Number(r.balance || balance);
-                        toast(r.message || 'Purchase successful');
-                        if (r.telegramLink) setTimeout(() => window.open(r.telegramLink, '_blank'), 500);
-                    } catch (e) { toast(e.message); btn.disabled = false; btn.textContent = old; }
-                });
-            });
-        } catch (e) {
-            if (grid) grid.innerHTML = '<p class="muted">Could not load</p>';
-        }
+        // Same data source as Tools/Format — kind=working only
+        return initPackPage('working');
     }
 
 
@@ -682,46 +633,78 @@ const Market = (function () {
             const bp = document.getElementById('balPill');
             if (bp) bp.textContent = money(balance);
         } catch (_) { }
-        const grid = document.getElementById('wpGrid') || document.getElementById('packGrid') || document.getElementById('toolsGrid') || document.getElementById('formatGrid');
+        const grid =
+            document.getElementById('wpGrid') ||
+            document.getElementById('packGrid') ||
+            document.getElementById('toolsGrid') ||
+            document.getElementById('formatGrid');
+        if (!grid) return;
+        const k = (kind || 'working').toLowerCase();
+        const emptyLabel =
+            k === 'tools'
+                ? 'No tools yet — admin must Save this pack under Tools'
+                : k === 'format'
+                    ? 'No format packs yet — admin must Save this pack under Format'
+                    : 'No working pictures yet — admin must Save this pack under Working Pictures';
         try {
-            const d = await api('/api/user/working-pictures?kind=' + encodeURIComponent(kind || 'working'));
-            if (!grid) return;
-            grid.innerHTML = (d.items || []).map((it) => {
-                const previews = (it.previewImages && it.previewImages.length)
-                    ? it.previewImages.slice(0, 3)
-                    : (it.coverImage ? [it.coverImage] : []);
-                return `
+            const d = await api('/api/user/working-pictures?kind=' + encodeURIComponent(k));
+            const items = d.items || [];
+            grid.innerHTML =
+                items
+                    .map((it) => {
+                        const previews =
+                            it.previewImages && it.previewImages.length
+                                ? it.previewImages.slice(0, 3)
+                                : it.coverImage
+                                    ? [it.coverImage]
+                                    : [];
+                        return `
         <div class="list-card" style="padding:12px;margin-bottom:12px;">
           <div style="display:flex;gap:6px;overflow-x:auto;">
-            ${previews.map((src) =>
-                    `<img src="${escape(src)}" style="width:100px;height:100px;object-fit:cover;border-radius:10px;cursor:pointer;" onclick="window.open(this.src,'_blank')" />`
-                ).join('') || '<div class="muted">No preview</div>'}
+            ${previews
+                                .map(
+                                    (src) =>
+                                        `<img src="${escape(src)}" style="width:100px;height:100px;object-fit:cover;border-radius:10px;cursor:pointer;" onclick="window.open(this.src,'_blank')" />`
+                                )
+                                .join('') || '<div class="muted">No preview</div>'
+                            }
           </div>
           <h3 style="margin:10px 0 4px;">${escape(it.title)}</h3>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
             <strong>${money(it.price)}</strong>
-            <button type="button" class="btn btn-red btn-wp-buy" data-id="${it._id}" data-price="${it.price}">Buy</button>
+            <button type="button" class="btn btn-red btn-wp-buy" data-id="${it._id || it.id}" data-price="${it.price}">Buy</button>
           </div>
         </div>`;
-            }).join('') || '<p class="muted">No packs yet — admin must Save this pack first</p>';
+                    })
+                    .join('') || `<p class="muted">${emptyLabel}</p>`;
             grid.querySelectorAll('.btn-wp-buy').forEach((btn) => {
                 btn.addEventListener('click', async () => {
                     if (balance < Number(btn.getAttribute('data-price'))) {
                         return toast('Please fund your account. Your balance is not enough.');
                     }
+                    const old = btn.textContent;
+                    btn.disabled = true;
+                    btn.textContent = '......';
                     try {
                         const r = await api('/api/user/working-pictures/buy', {
                             method: 'POST',
                             body: JSON.stringify({ id: btn.getAttribute('data-id') })
                         });
                         balance = Number(r.balance || balance);
+                        const bp = document.getElementById('balPill');
+                        if (bp) bp.textContent = money(balance);
                         toast(r.message || 'Purchase successful');
                         if (r.telegramLink) setTimeout(() => window.open(r.telegramLink, '_blank'), 400);
-                    } catch (e) { toast(e.message); }
+                        btn.textContent = 'Bought';
+                    } catch (e) {
+                        toast(e.message);
+                        btn.disabled = false;
+                        btn.textContent = old || 'Buy';
+                    }
                 });
             });
         } catch (e) {
-            if (grid) grid.innerHTML = '<p class="muted">Could not load</p>';
+            if (grid) grid.innerHTML = '<p class="muted">Could not load. Check connection.</p>';
         }
     }
 

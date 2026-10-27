@@ -38,6 +38,9 @@ const siteSettingsSchema = new mongoose.Schema({
     liveServiceLink: { type: String, default: '' },
     waServiceLabel: { type: String, default: 'WhatsApp Contact' },
 
+    // Custom log categories (appear on customer dropdown even before a log is saved)
+    categories: { type: [String], default: [] },
+
     // Admin board login (separate from customer)
     adminUsername: { type: String, default: 'Samuelthetrader' },
     adminPasswordHash: { type: String, default: '' },

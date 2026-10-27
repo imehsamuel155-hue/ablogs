@@ -459,13 +459,20 @@
             if (!sel) return;
             const cur = sel.value;
             try {
-                const d = await api('/api/admin/products');
-                const cats = [...new Set((d.products || []).map((p) => p.category).filter(Boolean))].sort();
+                let cats = [];
+                try {
+                    const d = await api('/api/admin/categories');
+                    cats = d.categories || [];
+                } catch (_) {
+                    const d2 = await api('/api/admin/products');
+                    cats = [...new Set((d2.products || []).map((p) => p.category).filter(Boolean))];
+                }
+                cats.sort((a, b) => String(a).localeCompare(String(b)));
                 sel.innerHTML = '<option value="">— Select category —</option>';
                 cats.forEach((c) => {
                     const o = document.createElement('option');
                     o.value = c;
-                    o.textContent = c;
+                    o.textContent = String(c).charAt(0).toUpperCase() + String(c).slice(1);
                     sel.appendChild(o);
                 });
                 if (cur) sel.value = cur;
@@ -475,19 +482,35 @@
             const w = document.getElementById('customWrap');
             if (w) w.style.display = w.style.display === 'none' ? 'block' : 'none';
         });
-        document.getElementById('btnConfirmCat')?.addEventListener('click', () => {
+        document.getElementById('btnConfirmCat')?.addEventListener('click', async () => {
             const name = (document.getElementById('pCustom')?.value || '').trim();
             if (!name) return toast('Enter category name');
+            const val = name.toLowerCase();
+            try {
+                await api('/api/admin/categories', {
+                    method: 'POST',
+                    body: JSON.stringify({ name: val })
+                });
+            } catch (e) {
+                toast(e.message || 'Could not save category');
+                return;
+            }
             const sel = document.getElementById('pCat');
-            if (![...sel.options].some((o) => o.value.toLowerCase() === name.toLowerCase())) {
+            if (![...sel.options].some((o) => o.value.toLowerCase() === val)) {
                 const o = document.createElement('option');
-                o.value = name.toLowerCase();
+                o.value = val;
                 o.textContent = name;
                 sel.appendChild(o);
             }
-            sel.value = name.toLowerCase();
+            sel.value = val;
             document.getElementById('customWrap').style.display = 'none';
-            toast('Category ready — fill title & logins then Save log');
+            const formBox = document.getElementById('formBox');
+            if (formBox) formBox.style.display = 'block';
+            if (!document.querySelectorAll('#loginList .line').length) {
+                if (typeof addLine === 'function') { addLine(''); addLine(''); addLine(''); }
+            }
+            toast('Category saved — shows on customer Logs dropdown');
+            if (typeof refreshAdminCategories === 'function') refreshAdminCategories();
         });
         refreshAdminCategories();
 
@@ -514,9 +537,10 @@
         }
         document.getElementById('btnAddLine').onclick = () => addLine('');
         document.getElementById('pCat').onchange = function () {
-            document.getElementById('customWrap').style.display = this.value === 'add' ? 'block' : 'none';
-            document.getElementById('formBox').style.display = this.value ? 'block' : 'none';
-            if (this.value === 'add') document.getElementById('pCustom').focus();
+            const customWrap = document.getElementById('customWrap');
+            if (customWrap) customWrap.style.display = 'none';
+            const formBox = document.getElementById('formBox');
+            if (formBox) formBox.style.display = this.value ? 'block' : 'none';
             if (this.value && !document.querySelectorAll('#loginList .line').length) {
                 addLine(''); addLine(''); addLine('');
             }
@@ -565,10 +589,11 @@
                         body: JSON.stringify(it)
                     });
                 }
-                toast('Saved');
+                toast('Saved to MongoDB — visible on customer Logs now');
                 document.getElementById('loginList').innerHTML = '';
                 lineCount = 0; addLine(''); addLine(''); addLine('');
-                if (typeof loadSaved === 'function') loadSaved();
+                if (typeof loadSaved === 'function') await loadSaved();
+                if (typeof refreshAdminCategories === 'function') await refreshAdminCategories();
             } catch (e) { toast(e.message || 'Save failed'); }
             finally {
                 const b = document.getElementById('btnSave');
@@ -952,7 +977,8 @@
                                 soldOut: false
                             })
                         });
-                        toast('Pack saved — check customer Working Pictures');
+                        const label = kind === 'tools' ? 'Tools' : kind === 'format' ? 'Format' : 'Working Pictures';
+                        toast('Saved — appears on customer ' + label + ' page');
                         if (typeof loadPacks === 'function') loadPacks(kind || 'working');
                     } catch (e) { toast(e.message); }
                     finally {

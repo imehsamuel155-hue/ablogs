@@ -277,12 +277,75 @@ router.post('/products', adminAuth, async (req, res) => {
             duration: duration || '',
             isHot: !!isHot,
             viewAccountLink: viewAccountLink || '',
-            icon: icon || ''
+            icon: icon || '',
+            isActive: true,
+            stockItems: []
         });
-        res.json({ product });
+        // Keep category list in SiteSettings so customer dropdown stays in sync
+        try {
+            let s = await SiteSettings.findOne({ key: 'main' });
+            if (!s) s = await SiteSettings.create({ key: 'main' });
+            const list = Array.isArray(s.categories) ? s.categories : [];
+            if (cat && !list.map((x) => String(x).toLowerCase()).includes(cat)) {
+                list.push(cat);
+                s.categories = list;
+                await s.save();
+            }
+        } catch (_) { }
+        res.json({
+            product: {
+                _id: String(product._id),
+                id: String(product._id),
+                title: product.title,
+                category: product.category,
+                price: product.price,
+                isActive: product.isActive
+            }
+        });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Create failed' });
+    }
+});
+
+/** List + add custom categories (saved in MongoDB SiteSettings) */
+router.get('/categories', adminAuth, async (req, res) => {
+    try {
+        const fromProducts = await Product.distinct('category');
+        let s = await SiteSettings.findOne({ key: 'main' });
+        if (!s) s = await SiteSettings.create({ key: 'main' });
+        const fromSettings = s.categories || [];
+        const cats = [
+            ...new Set(
+                [...fromProducts, ...fromSettings]
+                    .filter(Boolean)
+                    .map((c) => String(c).trim())
+                    .filter(Boolean)
+            )
+        ].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+        res.json({ categories: cats });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed' });
+    }
+});
+
+router.post('/categories', adminAuth, async (req, res) => {
+    try {
+        const name = String(req.body.name || req.body.category || '').trim();
+        if (!name) return res.status(400).json({ error: 'Category name required' });
+        let s = await SiteSettings.findOne({ key: 'main' });
+        if (!s) s = await SiteSettings.create({ key: 'main' });
+        const list = Array.isArray(s.categories) ? s.categories : [];
+        const exists = list.some((c) => String(c).toLowerCase() === name.toLowerCase());
+        if (!exists) {
+            list.push(name.toLowerCase());
+            s.categories = list;
+            await s.save();
+        }
+        res.json({ ok: true, category: name.toLowerCase(), categories: s.categories });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: e.message || 'Failed' });
     }
 });
 
@@ -428,8 +491,20 @@ router.post('/working-pictures', adminAuth, async (req, res) => {
         if (!body.coverImage && body.previewImages && body.previewImages[0]) {
             body.coverImage = body.previewImages[0];
         }
+        body.isActive = true;
+        body.soldOut = false;
+        if (!body.kind) body.kind = 'working';
         const item = await WorkingPicture.create(body);
-        res.json({ item });
+        res.json({
+            item: {
+                _id: String(item._id),
+                id: String(item._id),
+                kind: item.kind,
+                title: item.title,
+                price: item.price,
+                isActive: item.isActive
+            }
+        });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Create failed' });

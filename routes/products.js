@@ -54,8 +54,23 @@ router.get('/', async (req, res) => {
 
 router.get('/meta/categories', async (req, res) => {
     try {
-        const cats = await Product.distinct('category', { isActive: { $ne: false } });
-        res.json({ categories: (cats || []).filter(Boolean).sort() });
+        const fromProducts = await Product.distinct('category', { isActive: { $ne: false } });
+        let fromSettings = [];
+        try {
+            const SiteSettings = require('../models/SiteSettings');
+            const s = await SiteSettings.findOne({ key: 'main' }).lean();
+            fromSettings = (s && s.categories) || [];
+        } catch (_) { }
+        const cats = [
+            ...new Set(
+                [...(fromProducts || []), ...(fromSettings || [])]
+                    .filter(Boolean)
+                    .map((c) => String(c).trim())
+                    .filter(Boolean)
+            )
+        ];
+        cats.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+        res.json({ categories: cats });
     } catch (e) {
         res.status(500).json({ error: 'Failed' });
     }
