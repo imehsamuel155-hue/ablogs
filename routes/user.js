@@ -84,7 +84,7 @@ router.get('/transactions', auth, async (req, res) => {
 router.post('/buy', auth, async (req, res) => {
     try {
         const product = await Product.findById(req.body.productId);
-        if (!product || !product.isActive) return res.status(404).json({ error: 'Log not found' });
+        if (!product || product.isActive === false) return res.status(404).json({ error: 'Log not found' });
 
         let available = null;
         if (req.body.stockItemId) {
@@ -198,7 +198,7 @@ router.get('/working-pictures', auth, async (req, res) => {
 router.post('/working-pictures/buy', auth, async (req, res) => {
     try {
         const item = await WorkingPicture.findById(req.body.id);
-        if (!item || !item.isActive) return res.status(404).json({ error: 'Not found' });
+        if (!item || item.isActive === false) return res.status(404).json({ error: 'Not found' });
         const user = await User.findById(req.user.id);
         if (Number(user.balance) < Number(item.price)) {
             return res.status(400).json({ error: 'Insufficient funds' });

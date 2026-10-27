@@ -28,7 +28,8 @@ router.get('/', async (req, res) => {
     try {
         const q = (req.query.q || '').trim();
         const category = (req.query.category || '').trim().toLowerCase();
-        const filter = { isActive: true };
+        // $ne:false so older docs without isActive still show (Mongo only)
+        const filter = { isActive: { $ne: false } };
         if (category) {
             filter.category = new RegExp(
                 '^' + category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$',
@@ -53,7 +54,7 @@ router.get('/', async (req, res) => {
 
 router.get('/meta/categories', async (req, res) => {
     try {
-        const cats = await Product.distinct('category', { isActive: true });
+        const cats = await Product.distinct('category', { isActive: { $ne: false } });
         res.json({ categories: (cats || []).filter(Boolean).sort() });
     } catch (e) {
         res.status(500).json({ error: 'Failed' });
@@ -68,7 +69,7 @@ router.get('/:id', async (req, res) => {
         }
         const product = await Product.findById(raw);
         if (!product) return res.status(404).json({ error: 'Log not found' });
-        if (!product.isActive) return res.status(404).json({ error: 'Log is inactive' });
+        if (product.isActive === false) return res.status(404).json({ error: 'Log is inactive' });
 
         const available = (product.stockItems || [])
             .filter((s) => !s.sold)

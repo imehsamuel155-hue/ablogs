@@ -24,39 +24,56 @@ function auth(req, res, next) {
     }
 }
 
+function loadNodeRSA() {
+    // node-rsa export shape differs across Node / package versions
+    const mod = require('node-rsa');
+    if (typeof mod === 'function') return mod;
+    if (mod && typeof mod.NodeRSA === 'function') return mod.NodeRSA;
+    if (mod && typeof mod.default === 'function') return mod.default;
+    throw new Error('node-rsa module has no constructor');
+}
+
 function encryptPayload(obj) {
     // TransactPay expects RSA PKCS#1 v1.5 encryption of JSON, base64 output
-    const NodeRSA = require('node-rsa');
+    if (!TP_ENC) {
+        throw new Error('TRANSACTPAY_ENCRYPTION_KEY is missing on the server (set it on Render).');
+    }
+    if (!TP_PUBLIC) {
+        throw new Error('TRANSACTPAY_PUBLIC_KEY is missing on the server (set it on Render).');
+    }
+
     let keyData = TP_ENC;
     try {
-        // Client sent base64 of RSAKeyValue XML-ish string
+        // Dashboard key is usually base64 of RSAKeyValue XML
         const decoded = Buffer.from(TP_ENC, 'base64').toString('utf8');
         if (decoded.includes('Modulus') || decoded.includes('RSAKeyValue')) {
             keyData = decoded;
         }
     } catch (e) { }
 
+    const NodeRSA = loadNodeRSA();
     const key = new NodeRSA();
-    // Try PEM / components — if XML, extract modulus & exponent
+
     if (String(keyData).includes('Modulus')) {
         const modMatch = String(keyData).match(/<Modulus>([^<]+)<\/Modulus>/i);
         const expMatch = String(keyData).match(/<Exponent>([^<]+)<\/Exponent>/i);
-        if (modMatch && expMatch) {
-            key.importKey({
+        if (!modMatch || !expMatch) {
+            throw new Error('Encryption key XML missing Modulus/Exponent');
+        }
+        key.importKey(
+            {
                 n: Buffer.from(modMatch[1], 'base64'),
                 e: Buffer.from(expMatch[1], 'base64')
-            }, 'components-public');
-        } else {
-            key.importKey(keyData, 'pkcs8-public');
-        }
+            },
+            'components-public'
+        );
     } else if (String(keyData).includes('BEGIN')) {
         key.importKey(keyData, 'pkcs8-public');
     } else {
-        // raw base64 modulus fallback not reliable — try as pem
         try {
             key.importKey(keyData, 'pkcs8-public');
         } catch (e) {
-            throw new Error('Could not load TransactPay encryption key. Check TRANSACTPAY_ENCRYPTION_KEY.');
+            throw new Error('Could not load TransactPay encryption key. Check TRANSACTPAY_ENCRYPTION_KEY on Render.');
         }
     }
     key.setOptions({ encryptionScheme: 'pkcs1' });
@@ -124,19 +141,19 @@ router.post('/virtual-account', auth, async (req, res) => {
             Narration: 'Ablogs wallet ' + user.email
         };
 
-        let body;
+        let encrypted;
         try {
-            const encrypted = encryptPayload(payload);
-            body = { data: encrypted };
+            encrypted = encryptPayload(payload);
         } catch (encErr) {
-            // Fallback: some environments accept plain (test) — try plain then fail clearly
-            console.warn('Encrypt warning:', encErr.message);
-            body = payload;
+            console.error('TransactPay encrypt failed:', encErr.message);
+            return res.status(500).json({
+                error: encErr.message || 'Could not encrypt payload for TransactPay. Set TRANSACTPAY_ENCRYPTION_KEY on Render.'
+            });
         }
 
         const response = await axios.post(
             TP_BASE + '/payment/virtual-account/generate',
-            body,
+            { data: encrypted },
             {
                 headers: {
                     'api-key': TP_PUBLIC,
@@ -152,35 +169,58 @@ router.post('/virtual-account', auth, async (req, res) => {
         if (!response.status || response.status >= 400 || data.status === false) {
             console.error('TransactPay VA error', response.status, data);
             return res.status(502).json({
-                error: data.message || 'Could not generate deposit account. Check TransactPay keys / plan.',
+                error: data.message || 'Could not generate deposit account. Check TransactPay keys / plan on Render.',
                 detail: data
             });
         }
 
-        // TransactPay responses vary — dig for account fields
-        const d0 = data.data || data.result || data.payload || data;
-        const d1 = (d0 && typeof d0 === 'object') ? (d0.data || d0.account || d0.virtualAccount || d0) : {};
-        const dig = (...objs) => {
+        // Official success shape puts fields at top level:
+        // { status, message, accountNumber, accountName, bank, bankCode }
+        const pick = (...objs) => {
             for (const o of objs) {
                 if (!o || typeof o !== 'object') continue;
-                const num = o.accountNumber || o.account_number || o.AccountNumber || o.nuban || o.accountNo || o.account_no;
+                const num =
+                    o.accountNumber ||
+                    o.account_number ||
+                    o.AccountNumber ||
+                    o.nuban ||
+                    o.accountNo ||
+                    o.account_no;
                 if (num) return o;
             }
             return {};
         };
-        const src = dig(d1, d0, data);
+        const nested = data.data || data.result || data.payload || null;
+        const src = pick(data, nested, nested && nested.data, nested && nested.account, nested && nested.virtualAccount);
         const va = {
-            accountNumber: String(src.accountNumber || src.account_number || src.AccountNumber || src.nuban || src.accountNo || '').trim(),
-            accountName: String(src.accountName || src.account_name || src.AccountName || src.beneficiary_name || user.name || '').trim(),
-            bank: String(src.bank || src.bank_name || src.bankName || src.BankName || '').trim(),
-            bankCode: String(src.bankCode || src.bank_code || '').trim(),
+            accountNumber: String(
+                src.accountNumber ||
+                src.account_number ||
+                src.AccountNumber ||
+                src.nuban ||
+                src.accountNo ||
+                data.accountNumber ||
+                ''
+            ).trim(),
+            accountName: String(
+                src.accountName ||
+                src.account_name ||
+                src.AccountName ||
+                src.beneficiary_name ||
+                data.accountName ||
+                user.name ||
+                ''
+            ).trim(),
+            bank: String(src.bank || src.bank_name || src.bankName || src.BankName || data.bank || '').trim(),
+            bankCode: String(src.bankCode || src.bank_code || data.bankCode || '').trim(),
             reference: reference
         };
 
         if (!va.accountNumber) {
             console.error('TransactPay VA empty fields', JSON.stringify(data).slice(0, 2000));
             return res.status(502).json({
-                error: 'Payment gateway did not return an account number. Check TransactPay keys on Render and that virtual accounts are enabled on your plan.',
+                error:
+                    'Payment gateway did not return an account number. Confirm TRANSACTPAY_PUBLIC_KEY + TRANSACTPAY_ENCRYPTION_KEY on Render match the dashboard, and virtual accounts are enabled.',
                 detail: data
             });
         }

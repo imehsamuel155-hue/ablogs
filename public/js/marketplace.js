@@ -575,7 +575,10 @@ const Market = (function () {
                 });
                 const va = r.virtualAccount || r;
                 if (!va.accountNumber && !va.account_number) {
-                    throw new Error(r.error || 'Gateway returned empty account. Check TransactPay keys on Render.');
+                    throw new Error(
+                        r.error ||
+                        'Gateway returned empty account. On Render set TRANSACTPAY_PUBLIC_KEY, TRANSACTPAY_SECRET_KEY and TRANSACTPAY_ENCRYPTION_KEY to match your TransactPay dashboard.'
+                    );
                 }
                 showVaBox(va);
                 toast(r.reused ? 'Your permanent deposit account' : 'Deposit account ready');
