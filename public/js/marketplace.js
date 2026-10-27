@@ -11,10 +11,13 @@ const Market = (function () {
         t.classList.add('show');
         setTimeout(() => t.classList.remove('show'), 3000);
     }
+    // Local: empty. Firebase+Render: set in /js/config.js → window.ABLOGS_API = 'https://xxx.onrender.com'
+    const API_BASE = (typeof window !== 'undefined' && window.ABLOGS_API) ? String(window.ABLOGS_API).replace(/\/$/, '') : '';
     async function api(path, opts = {}) {
         const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
         if (token()) headers.Authorization = 'Bearer ' + token();
-        const res = await fetch(path, Object.assign({}, opts, { headers }));
+        const url = path.startsWith('http') ? path : (API_BASE + path);
+        const res = await fetch(url, Object.assign({}, opts, { headers }));
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'Request failed');
         return data;
@@ -90,7 +93,7 @@ const Market = (function () {
             }
         }
         tick();
-        setInterval(tick, 15000);
+        setInterval(tick, 1000);
     }
 
     function showAnnouncement(s) {
@@ -203,13 +206,18 @@ const Market = (function () {
 
         document.getElementById('chatSend')?.addEventListener('click', async () => {
             const input = document.getElementById('chatInput');
+            const btn = document.getElementById('chatSend');
             const text = (input?.value || '').trim();
             if (!text) return;
+            if (btn) { btn.disabled = true; btn.textContent = '......'; }
             try {
                 await api('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text }) });
                 input.value = '';
-                loadChat();
+                await loadChat();
             } catch (e) { toast(e.message); }
+            finally {
+                if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+            }
         });
 
         document.getElementById('chatPhoto')?.addEventListener('change', async function () {
@@ -269,7 +277,9 @@ const Market = (function () {
             const data = await api('/api/user/dashboard');
             const u = data.user;
             localStorage.setItem('ablogs_user', JSON.stringify(u));
-            document.getElementById('userFirst').textContent = (u.name || 'User').split(' ')[0];
+            const first = (u.name || (JSON.parse(localStorage.getItem('ablogs_user') || '{}').name) || 'User').toString().split(' ')[0];
+            const uf = document.getElementById('userFirst');
+            if (uf) uf.textContent = first || 'User';
             document.getElementById('drawerName').textContent = u.name || u.email;
             const balEl = document.getElementById('walletBal');
             if (balEl) balEl.textContent = money(u.balance);
@@ -489,17 +499,34 @@ const Market = (function () {
             if (el) el.textContent = money(dash.user.balance);
         } catch (_) { }
         document.getElementById('btnCreateVA')?.addEventListener('click', async () => {
+            const btn = document.getElementById('btnCreateVA');
+            const phoneEl = document.getElementById('vaPhone');
+            const phone = (phoneEl?.value || '').trim();
+            if (!phone || phone.replace(/\D/g, '').length < 10) {
+                return toast('Enter a valid phone number');
+            }
+            const prev = btn ? btn.textContent : '';
+            if (btn) { btn.disabled = true; btn.textContent = '......'; }
             try {
-                const r = await api('/api/payments/virtual-account', { method: 'POST', body: '{}' });
+                const r = await api('/api/payments/virtual-account', {
+                    method: 'POST',
+                    body: JSON.stringify({ phone })
+                });
+                const va = r.virtualAccount || r;
                 const box = document.getElementById('vaBox');
                 if (box) {
+                    box.style.display = 'block';
                     box.innerHTML = `
-            <p><strong>Account name:</strong> ${escape(r.accountName || r.account_name || '')}</p>
-            <p><strong>Account number:</strong> ${escape(r.accountNumber || r.account_number || '')}</p>
-            <p><strong>Bank:</strong> ${escape(r.bankName || r.bank_name || '')}</p>
-            <p class="muted">Transfer any amount — it credits your wallet automatically.</p>`;
+            <p><strong>Account name:</strong> ${escape(va.accountName || va.account_name || '')}</p>
+            <p><strong>Account number:</strong> ${escape(va.accountNumber || va.account_number || '')}</p>
+            <p><strong>Bank:</strong> ${escape(va.bank || va.bankName || va.bank_name || '')}</p>
+            <p class="muted">Transfer any amount — it credits your wallet after confirmation.</p>`;
                 }
-            } catch (e) { toast(e.message); }
+                toast('Deposit account ready');
+            } catch (e) { toast(e.message || 'Could not get deposit account'); }
+            finally {
+                if (btn) { btn.disabled = false; btn.textContent = prev || 'Get deposit account number'; }
+            }
         });
     }
 
@@ -511,6 +538,10 @@ const Market = (function () {
             const u = dash.user;
             const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
             set('pfName', u.name); set('pfEmail', u.email); set('pfPhone', u.phone);
+            ['pfName', 'pfEmail', 'pfPhone'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) { el.readOnly = true; el.disabled = true; el.style.background = '#f1f5f9'; el.style.cursor = 'not-allowed'; }
+            });
         } catch (_) { }
         document.getElementById('btnSaveProfile')?.addEventListener('click', async () => {
             try {

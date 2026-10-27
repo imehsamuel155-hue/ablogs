@@ -50,7 +50,7 @@ router.post('/messages', optionalAuth, async (req, res) => {
         if (!text && !image) return res.status(400).json({ error: 'Message or photo required' });
 
         const msg = await ChatMessage.create({
-            user: req.user ? req.user.id : undefined,
+            user: req.user && req.user.id && req.user.id !== 'admin-board' ? req.user.id : undefined,
             guestName: req.user ? undefined : (req.body.guestName || 'Guest'),
             from: 'user',
             text: text || (image ? '[Photo]' : ''),

@@ -314,10 +314,6 @@
 
         <div class="card">
             <h2>Saved logs</h2>
-            <button type="button" class="btn-out btn-sm" id="btnClearEmpty" style="margin-bottom:10px;">Remove sample /
-                empty logs</button>
-            <button type="button" class="btn-out btn-sm" id="btnDeleteAllLogs"
-                style="margin-bottom:10px;color:#b91c1c;border-color:#b91c1c;">Delete ALL logs</button>
             <div id="savedList" class="muted">Loading…</div>
         </div>
 
@@ -455,11 +451,17 @@
 
         // LOGS
         let lineCount = 0;
-        function addLine(val) {
+        function addLine(val, url) {
             lineCount++;
             const row = document.createElement('div');
             row.className = 'line';
-            row.innerHTML = `<span class="num">${lineCount}.</span><input class="login-line" placeholder="login #${lineCount}" value="${val || ''}" /><button type="button" class="btn-out btn-sm rm">×</button>`;
+            row.style.flexWrap = 'wrap';
+            row.innerHTML = `<span class="num">${lineCount}.</span>
+        <div style="flex:1;min-width:180px;border:1px solid #e5e7eb;border-radius:10px;padding:8px;background:#fafafa;">
+          <input class="login-line" placeholder="login / password details #${lineCount}" value="${(val || '').replace(/"/g, '&quot;')}" style="width:100%;border:1px solid #e5e7eb;border-radius:8px;padding:8px;margin-bottom:6px;box-sizing:border-box;" />
+          <input class="login-url" placeholder="URL for this login (eye / view)" value="${(url || '').replace(/"/g, '&quot;')}" style="width:100%;border:1px solid #e5e7eb;border-radius:8px;padding:8px;box-sizing:border-box;" />
+        </div>
+        <button type="button" class="btn-out btn-sm rm">×</button>`;
             row.querySelector('.rm').onclick = () => { row.remove(); renumber(); };
             document.getElementById('loginList').appendChild(row);
         }
@@ -488,131 +490,144 @@
             reader.readAsDataURL(f);
         };
         document.getElementById('btnSave').onclick = async () => {
+            const _btn = document.getElementById('btnSave');
+            if (_btn) { _btn.disabled = true; _btn.textContent = '......'; }
             try {
-                const lines = Array.from(document.querySelectorAll('.login-line')).map(i => i.value.trim()).filter(Boolean);
-                if (!document.getElementById('pTitle').value.trim()) return toast('Title required');
-                if (!lines.length) return toast('Add logins');
+                const rows = [];
+                document.querySelectorAll('#loginList .line').forEach((row) => {
+                    const login = row.querySelector('.login-line')?.value.trim();
+                    const url = row.querySelector('.login-url')?.value.trim() || document.getElementById('pUrl')?.value || '';
+                    if (login) rows.push({ loginDetails: login, previewLink: url });
+                });
+                if (!document.getElementById('pTitle').value.trim()) { toast('Title required'); return; }
+                if (!rows.length) { toast('Add logins'); return; }
+                const catSel = document.getElementById('pCat').value;
+                const custom = (document.getElementById('pCustom')?.value || '').trim();
+                const category = (catSel === 'add' || catSel === 'custom') ? (custom || 'custom') : catSel;
                 const product = await api('/api/admin/products', {
                     method: 'POST',
                     body: JSON.stringify({
-                        title: document.getElementById('pTitle').value,
-                        category: document.getElementById('pCat').value === 'add'
-                            ? (document.getElementById('pCustom').value.trim() || 'custom')
-                            : document.getElementById('pCat').value,
-                        customCategory: document.getElementById('pCustom').value,
+                        title: document.getElementById('pTitle').value.trim(),
+                        category: category,
+                        customCategory: custom,
                         price: document.getElementById('pPrice').value,
-                        image: document.getElementById('photoPrev').dataset.data || '',
+                        description: custom || '',
+                        image: document.getElementById('photoPrev')?.dataset?.data || '',
                         viewAccountLink: document.getElementById('pUrl').value
                     })
                 });
                 const id = product.product._id || product.product.id;
-                await api('/api/admin/products/' + id + '/stock', {
-                    method: 'POST',
-                    body: JSON.stringify({ bulkLogins: lines.join('\n'), previewLink: document.getElementById('pUrl').value })
-                });
+                for (const it of rows) {
+                    await api('/api/admin/products/' + id + '/stock', {
+                        method: 'POST',
+                        body: JSON.stringify(it)
+                    });
+                }
                 toast('Saved');
                 document.getElementById('loginList').innerHTML = '';
                 lineCount = 0; addLine(''); addLine(''); addLine('');
-                async function loadSiteStats() {
-                    try {
-                        const d = await api('/api/admin/site-stats');
-                        const n = (x) => '₦' + Number(x || 0).toLocaleString();
-                        const el = (id) => document.getElementById(id);
-                        if (el('siteDepositTotal')) el('siteDepositTotal').textContent = n(d.totalDeposited);
-                        if (el('siteDepositCount')) el('siteDepositCount').textContent = d.depositCount || 0;
-                        if (el('siteUsers')) el('siteUsers').textContent = d.userCount || 0;
-                        if (el('siteOrders')) el('siteOrders').textContent = d.orderCount || 0;
-                        if (el('siteSuccessOrders')) el('siteSuccessOrders').textContent = d.successfulOrders || 0;
-                        if (el('siteFailedOrders')) el('siteFailedOrders').textContent = d.failedOrders || 0;
-                        if (el('sitePendingOrders')) el('sitePendingOrders').textContent = d.pendingOrders || 0;
-                        if (el('siteSuccessRev')) el('siteSuccessRev').textContent = n(d.successfulRevenue) + ' revenue';
-                    } catch (_) { }
-                }
+                if (typeof loadSaved === 'function') loadSaved();
+            } catch (e) { toast(e.message || 'Save failed'); }
+            finally {
+                const b = document.getElementById('btnSave');
+                if (b) { b.disabled = false; b.textContent = 'Save log'; }
+            }
+        };
 
-                let activeChatUser = null;
-                async function loadSettingsForm() { /* logo/whatsapp settings removed — edit HTML files directly */ }
+        async function loadSiteStats() {
+            try {
+                const d = await api('/api/admin/site-stats');
+                const n = (x) => '₦' + Number(x || 0).toLocaleString();
+                const el = (id) => document.getElementById(id);
+                if (el('siteDepositTotal')) el('siteDepositTotal').textContent = n(d.totalDeposited);
+                if (el('siteDepositCount')) el('siteDepositCount').textContent = d.depositCount || 0;
+                if (el('siteUsers')) el('siteUsers').textContent = d.userCount || 0;
+                if (el('siteOrders')) el('siteOrders').textContent = d.orderCount || 0;
+                if (el('siteSuccessOrders')) el('siteSuccessOrders').textContent = d.successfulOrders || 0;
+                if (el('siteFailedOrders')) el('siteFailedOrders').textContent = d.failedOrders || 0;
+                if (el('sitePendingOrders')) el('sitePendingOrders').textContent = d.pendingOrders || 0;
+                if (el('siteSuccessRev')) el('siteSuccessRev').textContent = n(d.successfulRevenue) + ' revenue';
+            } catch (_) { }
+        }
 
-                async function loadChatThreads() {
-                    try {
-                        const d = await api('/api/chat/admin/threads');
-                        const box = document.getElementById('chatThreads');
-                        const threads = d.threads || d.items || [];
-                        if (!threads.length) { box.innerHTML = '<span class="muted">No customer chats yet</span>'; return; }
-                        box.innerHTML = threads.map((th) => {
-                            const id = th.userId || th.user || th._id;
-                            const name = th.name || th.userName || th.email || 'Customer';
-                            const preview = th.lastText || th.lastMessage || th.preview || '';
-                            return `<div class="log-row" style="cursor:pointer;" data-uid="${id}" data-name="${name}">
+        let activeChatUser = null;
+        async function loadSettingsForm() { /* logo/whatsapp settings removed — edit HTML files directly */ }
+
+        async function loadChatThreads() {
+            try {
+                const d = await api('/api/chat/admin/threads');
+                const box = document.getElementById('chatThreads');
+                const threads = d.threads || d.items || [];
+                if (!threads.length) { box.innerHTML = '<span class="muted">No customer chats yet</span>'; return; }
+                box.innerHTML = threads.map((th) => {
+                    const id = th.userId || th.user || th._id;
+                    const name = th.name || th.userName || th.email || 'Customer';
+                    const preview = th.lastText || th.lastMessage || th.preview || '';
+                    return `<div class="log-row" style="cursor:pointer;" data-uid="${id}" data-name="${name}">
             <div><strong>${name}</strong><div class="muted">${preview}</div></div>
             <button type="button" class="btn-out btn-sm">Open</button>
           </div>`;
-                        }).join('');
-                        box.querySelectorAll('[data-uid]').forEach((row) => {
-                            row.onclick = () => openChat(row.getAttribute('data-uid'), row.getAttribute('data-name'));
-                        });
-                    } catch (e) {
-                        document.getElementById('chatThreads').innerHTML = '<span class="muted">Chat load failed</span>';
-                    }
-                }
-                async function openChat(userId, name) {
-                    activeChatUser = userId;
-                    document.getElementById('chatPanel').style.display = 'block';
-                    document.getElementById('chatWith').textContent = 'Chat with ' + name;
-                    await loadChatMsgs();
-                }
-                async function loadChatMsgs() {
-                    if (!activeChatUser) return;
-                    try {
-                        const d = await api('/api/chat/admin/messages/' + activeChatUser);
-                        const msgs = d.messages || [];
-                        const box = document.getElementById('chatMsgs');
-                        box.innerHTML = msgs.map((m) => {
-                            const mine = m.from === 'admin' || m.fromAdmin;
-                            const align = mine ? 'right' : 'left';
-                            const bg = mine ? '#dbeafe' : '#fff';
-                            let body = m.image ? `<img src="${m.image}" style="max-width:160px;border-radius:8px;" />` : (m.text || m.message || '');
-                            return `<div style="text-align:${align};margin:6px 0;"><span style="display:inline-block;background:${bg};padding:8px 10px;border-radius:10px;max-width:85%;">${body}</span></div>`;
-                        }).join('') || '<span class="muted">No messages</span>';
-                        box.scrollTop = box.scrollHeight;
-                    } catch (_) { }
-                }
-                document.getElementById('btnChatSend').onclick = async () => {
-                    const text = document.getElementById('chatReply').value.trim();
-                    if (!text || !activeChatUser) return;
-                    try {
-                        await api('/api/chat/admin/messages/' + activeChatUser, {
-                            method: 'POST',
-                            body: JSON.stringify({ text })
-                        });
-                        document.getElementById('chatReply').value = '';
-                        loadChatMsgs();
-                    } catch (e) { toast(e.message); }
-                };
-                document.getElementById('chatPhotoAdmin').onchange = async function () {
-                    const f = this.files && this.files[0];
-                    if (!f || !activeChatUser) return;
-                    const reader = new FileReader();
-                    reader.onload = async () => {
-                        try {
-                            await api('/api/chat/admin/messages/' + activeChatUser, {
-                                method: 'POST',
-                                body: JSON.stringify({ text: '', image: reader.result })
-                            });
-                            loadChatMsgs();
-                        } catch (e) { toast(e.message); }
-                    };
-                    reader.readAsDataURL(f);
-                };
-
-                // remove old bell handlers if present
-
-                loadSettingsForm();
-                loadChatThreads();
-                loadSiteStats();
-                loadSaved();
+                }).join('');
+                box.querySelectorAll('[data-uid]').forEach((row) => {
+                    row.onclick = () => openChat(row.getAttribute('data-uid'), row.getAttribute('data-name'));
+                });
+            } catch (e) {
+                document.getElementById('chatThreads').innerHTML = '<span class="muted">Chat load failed</span>';
+            }
+        }
+        async function openChat(userId, name) {
+            activeChatUser = userId;
+            document.getElementById('chatPanel').style.display = 'block';
+            document.getElementById('chatWith').textContent = 'Chat with ' + name;
+            await loadChatMsgs();
+        }
+        async function loadChatMsgs() {
+            if (!activeChatUser) return;
+            try {
+                const d = await api('/api/chat/admin/messages/' + activeChatUser);
+                const msgs = d.messages || [];
+                const box = document.getElementById('chatMsgs');
+                box.innerHTML = msgs.map((m) => {
+                    const mine = m.from === 'admin' || m.fromAdmin;
+                    const align = mine ? 'right' : 'left';
+                    const bg = mine ? '#dbeafe' : '#fff';
+                    let body = m.image ? `<img src="${m.image}" style="max-width:160px;border-radius:8px;" />` : (m.text || m.message || '');
+                    return `<div style="text-align:${align};margin:6px 0;"><span style="display:inline-block;background:${bg};padding:8px 10px;border-radius:10px;max-width:85%;">${body}</span></div>`;
+                }).join('') || '<span class="muted">No messages</span>';
+                box.scrollTop = box.scrollHeight;
+            } catch (_) { }
+        }
+        document.getElementById('btnChatSend').onclick = async () => {
+            const text = document.getElementById('chatReply').value.trim();
+            if (!text || !activeChatUser) return;
+            try {
+                await api('/api/chat/admin/messages/' + activeChatUser, {
+                    method: 'POST',
+                    body: JSON.stringify({ text })
+                });
+                document.getElementById('chatReply').value = '';
+                loadChatMsgs();
             } catch (e) { toast(e.message); }
         };
+        document.getElementById('chatPhotoAdmin').onchange = async function () {
+            const f = this.files && this.files[0];
+            if (!f || !activeChatUser) return;
+            const reader = new FileReader();
+            reader.onload = async () => {
+                try {
+                    await api('/api/chat/admin/messages/' + activeChatUser, {
+                        method: 'POST',
+                        body: JSON.stringify({ text: '', image: reader.result })
+                    });
+                    loadChatMsgs();
+                } catch (e) { toast(e.message); }
+            };
+            reader.readAsDataURL(f);
+        };
 
+        // remove old bell handlers if present
+
+        // boot after defs — moved to end
         async function loadSaved() {
             const d = await api('/api/admin/products');
             const box = document.getElementById('savedList');
@@ -640,7 +655,9 @@
                 btn.onclick = async () => {
                     if (!confirm('Delete?')) return;
                     await api('/api/admin/products/' + btn.getAttribute('data-del'), { method: 'DELETE' });
-                    async function loadSiteStats() {
+                    toast('Deleted');
+                    if (typeof loadSaved === 'function') loadSaved();
+                    async function loadSiteStats_dup1() {
                         try {
                             const d = await api('/api/admin/site-stats');
                             document.getElementById('siteDepositTotal').textContent = '₦' + Number(d.totalDeposited || 0).toLocaleString();
@@ -650,10 +667,10 @@
                         } catch (_) { }
                     }
 
-                    let activeChatUser = null;
+                    /* activeChatUser already set */
                     async function loadSettingsForm() { /* logo/whatsapp settings removed — edit HTML files directly */ }
 
-                    async function loadChatThreads() {
+                    async function loadChatThreads_dup1() {
                         try {
                             const d = await api('/api/chat/admin/threads');
                             const box = document.getElementById('chatThreads');
@@ -675,13 +692,13 @@
                             document.getElementById('chatThreads').innerHTML = '<span class="muted">Chat load failed</span>';
                         }
                     }
-                    async function openChat(userId, name) {
+                    async function openChat_dup1(userId, name) {
                         activeChatUser = userId;
                         document.getElementById('chatPanel').style.display = 'block';
                         document.getElementById('chatWith').textContent = 'Chat with ' + name;
                         await loadChatMsgs();
                     }
-                    async function loadChatMsgs() {
+                    async function loadChatMsgs_dup1() {
                         if (!activeChatUser) return;
                         try {
                             const d = await api('/api/chat/admin/messages/' + activeChatUser);
@@ -734,11 +751,11 @@
                 };
             });
         }
-        document.getElementById('btnClearEmpty').onclick = async () => {
+        const _cle = document.getElementById('btnClearEmpty'); if (_cle) _cle.onclick = async () => {
             try {
                 const r = await api('/api/admin/products/clear-empty', { method: 'POST', body: '{}' });
                 toast('Removed ' + r.removed + ' empty logs');
-                async function loadSiteStats() {
+                async function loadSiteStats_dup2() {
                     try {
                         const d = await api('/api/admin/site-stats');
                         document.getElementById('siteDepositTotal').textContent = '₦' + Number(d.totalDeposited || 0).toLocaleString();
@@ -748,10 +765,10 @@
                     } catch (_) { }
                 }
 
-                let activeChatUser = null;
+                /* let activeChatUser = null; */
                 async function loadSettingsForm() { /* logo/whatsapp settings removed — edit HTML files directly */ }
 
-                async function loadChatThreads() {
+                async function loadChatThreads_dup2() {
                     try {
                         const d = await api('/api/chat/admin/threads');
                         const box = document.getElementById('chatThreads');
@@ -773,13 +790,13 @@
                         document.getElementById('chatThreads').innerHTML = '<span class="muted">Chat load failed</span>';
                     }
                 }
-                async function openChat(userId, name) {
+                async function openChat_dup2(userId, name) {
                     activeChatUser = userId;
                     document.getElementById('chatPanel').style.display = 'block';
                     document.getElementById('chatWith').textContent = 'Chat with ' + name;
                     await loadChatMsgs();
                 }
-                async function loadChatMsgs() {
+                async function loadChatMsgs_dup2() {
                     if (!activeChatUser) return;
                     try {
                         const d = await api('/api/chat/admin/messages/' + activeChatUser);
@@ -925,7 +942,7 @@
         }
 
 
-        async function loadSiteStats() {
+        async function loadSiteStats_dup3() {
             try {
                 const d = await api('/api/admin/site-stats');
                 document.getElementById('siteDepositTotal').textContent = '₦' + Number(d.totalDeposited || 0).toLocaleString();
@@ -935,10 +952,10 @@
             } catch (_) { }
         }
 
-        let activeChatUser = null;
+        /* let activeChatUser = null; */
         async function loadSettingsForm() { /* logo/whatsapp settings removed — edit HTML files directly */ }
 
-        async function loadChatThreads() {
+        async function loadChatThreads_dup3() {
             try {
                 const d = await api('/api/chat/admin/threads');
                 const box = document.getElementById('chatThreads');
@@ -960,13 +977,13 @@
                 document.getElementById('chatThreads').innerHTML = '<span class="muted">Chat load failed</span>';
             }
         }
-        async function openChat(userId, name) {
+        async function openChat_dup3(userId, name) {
             activeChatUser = userId;
             document.getElementById('chatPanel').style.display = 'block';
             document.getElementById('chatWith').textContent = 'Chat with ' + name;
             await loadChatMsgs();
         }
-        async function loadChatMsgs() {
+        async function loadChatMsgs_dup3() {
             if (!activeChatUser) return;
             try {
                 const d = await api('/api/chat/admin/messages/' + activeChatUser);
@@ -1143,6 +1160,7 @@
                 err.textContent = ex.message || 'Save failed';
             }
         });
+        try { loadSettingsForm(); loadChatThreads(); loadSiteStats(); loadSaved(); } catch (_) { }
         bootAdmin();
 
     </script>
