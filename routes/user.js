@@ -169,19 +169,22 @@ router.get('/settings-public', async (req, res) => {
 router.get('/working-pictures', auth, async (req, res) => {
     try {
         const kind = String(req.query.kind || 'working').toLowerCase().trim();
-        const filter = { isActive: { $ne: false } };
+        // Load all packs then filter in JS (same logic as admin list) so kind / isActive edge cases never hide items
+        const all = await WorkingPicture.find({}).sort({ createdAt: -1 }).lean();
+        let rows = (all || []).filter((it) => it && it.isActive !== false && it.soldOut !== true);
         if (kind === 'tools' || kind === 'format' || kind === 'working') {
-            filter.kind = kind;
+            rows = rows.filter(
+                (it) => String(it.kind || 'working').toLowerCase().trim() === kind
+            );
         }
-        const items = await WorkingPicture.find(filter).sort({ createdAt: -1 }).lean();
         res.json({
-            items: (items || []).map((it) => ({
+            items: rows.map((it) => ({
                 _id: String(it._id),
                 id: String(it._id),
-                kind: it.kind || 'working',
+                kind: String(it.kind || 'working').toLowerCase(),
                 title: it.title || '',
-                price: it.price || 0,
-                previewImages: it.previewImages || [],
+                price: Number(it.price) || 0,
+                previewImages: Array.isArray(it.previewImages) ? it.previewImages : [],
                 coverImage: it.coverImage || '',
                 picturesCount: it.picturesCount || (it.previewImages || []).length || 0,
                 videosCount: it.videosCount || 0,
@@ -190,7 +193,7 @@ router.get('/working-pictures', auth, async (req, res) => {
             }))
         });
     } catch (e) {
-        console.error(e);
+        console.error('working-pictures list', e);
         res.status(500).json({ error: 'Failed to load packs' });
     }
 });

@@ -76,6 +76,39 @@ router.get('/meta/categories', async (req, res) => {
     }
 });
 
+/** Public catalog for Working Pictures / Tools / Format (same MongoDB as admin) */
+router.get('/packs', async (req, res) => {
+    try {
+        const WorkingPicture = require('../models/WorkingPicture');
+        const kind = String(req.query.kind || '').toLowerCase().trim();
+        const all = await WorkingPicture.find({}).sort({ createdAt: -1 }).lean();
+        let rows = (all || []).filter((it) => it && it.isActive !== false && it.soldOut !== true);
+        if (kind === 'tools' || kind === 'format' || kind === 'working') {
+            rows = rows.filter(
+                (it) => String(it.kind || 'working').toLowerCase().trim() === kind
+            );
+        }
+        res.json({
+            items: rows.map((it) => ({
+                _id: String(it._id),
+                id: String(it._id),
+                kind: String(it.kind || 'working').toLowerCase(),
+                title: it.title || '',
+                price: Number(it.price) || 0,
+                previewImages: Array.isArray(it.previewImages) ? it.previewImages : [],
+                coverImage: it.coverImage || '',
+                picturesCount: it.picturesCount || (it.previewImages || []).length || 0,
+                videosCount: it.videosCount || 0,
+                telegramLink: it.telegramLink || '',
+                description: it.description || ''
+            }))
+        });
+    } catch (e) {
+        console.error('packs', e);
+        res.status(500).json({ error: 'Failed to load packs' });
+    }
+});
+
 router.get('/:id', async (req, res) => {
     try {
         const raw = String(req.params.id || '').trim();

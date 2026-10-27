@@ -475,8 +475,22 @@ router.put('/settings', adminAuth, async (req, res) => {
 
 router.get('/working-pictures', adminAuth, async (req, res) => {
     try {
-        const items = await WorkingPicture.find().sort({ createdAt: -1 });
-        res.json({ items });
+        const rows = await WorkingPicture.find().sort({ createdAt: -1 }).lean();
+        res.json({
+            items: (rows || []).map((it) => ({
+                _id: String(it._id),
+                id: String(it._id),
+                kind: String(it.kind || 'working').toLowerCase(),
+                title: it.title || '',
+                price: Number(it.price) || 0,
+                isActive: it.isActive !== false,
+                soldOut: !!it.soldOut,
+                previewImages: Array.isArray(it.previewImages) ? it.previewImages : [],
+                coverImage: it.coverImage || '',
+                telegramLink: it.telegramLink || '',
+                picturesCount: it.picturesCount || 0
+            }))
+        });
     } catch (e) {
         res.status(500).json({ error: 'Failed' });
     }

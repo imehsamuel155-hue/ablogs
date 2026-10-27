@@ -647,27 +647,44 @@ const Market = (function () {
                     ? 'No format packs yet — admin must Save this pack under Format'
                     : 'No working pictures yet — admin must Save this pack under Working Pictures';
         try {
-            const d = await api('/api/user/working-pictures?kind=' + encodeURIComponent(k));
-            const items = d.items || [];
-            grid.innerHTML =
-                items
-                    .map((it) => {
-                        const previews =
-                            it.previewImages && it.previewImages.length
-                                ? it.previewImages.slice(0, 3)
-                                : it.coverImage
-                                    ? [it.coverImage]
-                                    : [];
-                        return `
+            let d = { items: [] };
+            try {
+                d = await api('/api/user/working-pictures?kind=' + encodeURIComponent(k));
+            } catch (_) { }
+            let items = d.items || d.packs || [];
+            if (!Array.isArray(items) || !items.length) {
+                try {
+                    // Public packs endpoint — same MongoDB admin writes to
+                    d = await api('/api/products/packs?kind=' + encodeURIComponent(k));
+                    items = d.items || [];
+                } catch (_) { }
+            }
+            if (!Array.isArray(items)) items = [];
+            items = items.filter(
+                (it) => String(it.kind || 'working').toLowerCase().trim() === k
+            );
+            if (!items.length) {
+                grid.innerHTML = `<p class="muted">${emptyLabel}</p>`;
+                return;
+            }
+            grid.innerHTML = items
+                .map((it) => {
+                    const previews =
+                        it.previewImages && it.previewImages.length
+                            ? it.previewImages.slice(0, 3)
+                            : it.coverImage
+                                ? [it.coverImage]
+                                : [];
+                    return `
         <div class="list-card" style="padding:12px;margin-bottom:12px;">
           <div style="display:flex;gap:6px;overflow-x:auto;">
             ${previews
-                                .map(
-                                    (src) =>
-                                        `<img src="${escape(src)}" style="width:100px;height:100px;object-fit:cover;border-radius:10px;cursor:pointer;" onclick="window.open(this.src,'_blank')" />`
-                                )
-                                .join('') || '<div class="muted">No preview</div>'
-                            }
+                            .map(
+                                (src) =>
+                                    `<img src="${escape(src)}" style="width:100px;height:100px;object-fit:cover;border-radius:10px;cursor:pointer;" onclick="window.open(this.src,'_blank')" />`
+                            )
+                            .join('') || '<div class="muted">No preview</div>'
+                        }
           </div>
           <h3 style="margin:10px 0 4px;">${escape(it.title)}</h3>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
@@ -675,8 +692,8 @@ const Market = (function () {
             <button type="button" class="btn btn-red btn-wp-buy" data-id="${it._id || it.id}" data-price="${it.price}">Buy</button>
           </div>
         </div>`;
-                    })
-                    .join('') || `<p class="muted">${emptyLabel}</p>`;
+                })
+                .join('');
             grid.querySelectorAll('.btn-wp-buy').forEach((btn) => {
                 btn.addEventListener('click', async () => {
                     if (balance < Number(btn.getAttribute('data-price'))) {
@@ -704,7 +721,12 @@ const Market = (function () {
                 });
             });
         } catch (e) {
-            if (grid) grid.innerHTML = '<p class="muted">Could not load. Check connection.</p>';
+            if (grid) {
+                grid.innerHTML =
+                    '<p class="muted">Could not load packs: ' +
+                    escape(e.message || 'error') +
+                    '</p>';
+            }
         }
     }
 
