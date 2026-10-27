@@ -916,8 +916,34 @@
             } catch (e) { toast(e.message); }
         };
 
-        // Pack form builder (WP / tools / format) — up to 3 photos
-        function packFormHtml(kind, idx) {
+        // Pack form builder (WP / tools / format) — photos compressed so MongoDB save succeeds
+        function compressImageFile(file, maxW, quality) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onerror = () => resolve('');
+                reader.onload = () => {
+                    const img = new Image();
+                    img.onerror = () => resolve(String(reader.result || ''));
+                    img.onload = () => {
+                        try {
+                            const scale = Math.min(1, (maxW || 900) / Math.max(img.width, img.height));
+                            const w = Math.max(1, Math.round(img.width * scale));
+                            const h = Math.max(1, Math.round(img.height * scale));
+                            const canvas = document.createElement('canvas');
+                            canvas.width = w; canvas.height = h;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, w, h);
+                            resolve(canvas.toDataURL('image/jpeg', quality || 0.72));
+                        } catch (_) {
+                            resolve(String(reader.result || ''));
+                        }
+                    };
+                    img.src = reader.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        function packFormHtml(kind) {
             return `<div class="pack-form" data-kind="${kind}" style="border:1px dashed #e5e7eb;border-radius:12px;padding:12px;margin-bottom:12px;">
         <label>Photos (up to 3)</label>
         <input type="file" class="pk-photos" accept="image/*" multiple />
@@ -932,88 +958,125 @@
       </div>`;
         }
         function wirePackForm(container) {
+            if (!container) return;
             container.querySelectorAll('.pack-form').forEach((form) => {
                 if (form.dataset.wired) return;
                 form.dataset.wired = '1';
-                const previews = [];
-                form.querySelector('.pk-photos').onchange = function () {
-                    const files = Array.from(this.files || []).slice(0, 3);
-                    const box = form.querySelector('.pk-previews');
-                    box.innerHTML = '';
-                    previews.length = 0;
-                    files.forEach((f) => {
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                            previews.push(reader.result);
-                            const img = document.createElement('img');
-                            img.src = reader.result; img.className = 'preview'; img.style.display = 'block';
-                            box.appendChild(img);
-                        };
-                        reader.readAsDataURL(f);
-                    });
-                    form._previews = previews;
-                };
-                form.querySelector('.pk-save').onclick = async () => {
-                    const btn = form.querySelector('.pk-save');
-                    try {
-                        const kind = form.getAttribute('data-kind');
-                        const title = form.querySelector('.pk-title').value.trim();
-                        const url = form.querySelector('.pk-url').value.trim();
-                        const price = form.querySelector('.pk-price').value;
+                form._previews = [];
+                const photoInput = form.querySelector('.pk-photos');
+                if (photoInput) {
+                    photoInput.onchange = async function () {
+                        const files = Array.from(this.files || []).slice(0, 3);
+                        const box = form.querySelector('.pk-previews');
+                        if (box) box.innerHTML = '<span class="muted">Compressing…</span>';
+                        const out = [];
+                        for (const f of files) {
+                            const dataUrl = await compressImageFile(f, 900, 0.72);
+                            if (dataUrl) out.push(dataUrl);
+                        }
+                        form._previews = out;
+                        if (box) {
+                            box.innerHTML = '';
+                            out.forEach((src) => {
+                                const img = document.createElement('img');
+                                img.src = src;
+                                img.className = 'preview';
+                                img.style.display = 'block';
+                                img.style.width = '72px';
+                                img.style.height = '72px';
+                                img.style.objectFit = 'cover';
+                                img.style.borderRadius = '8px';
+                                box.appendChild(img);
+                            });
+                            if (!out.length) box.innerHTML = '<span class="muted">No photos</span>';
+                        }
+                    };
+                }
+                const saveBtn = form.querySelector('.pk-save');
+                if (saveBtn) {
+                    saveBtn.onclick = async () => {
+                        const kind = (form.getAttribute('data-kind') || 'working').toLowerCase();
+                        const title = (form.querySelector('.pk-title')?.value || '').trim();
+                        const url = (form.querySelector('.pk-url')?.value || '').trim();
+                        const price = form.querySelector('.pk-price')?.value;
                         if (!title) return toast('Write a title');
-                        if (btn) { btn.disabled = true; btn.textContent = '......'; }
-                        const imgs = form._previews || [];
-                        await api('/api/admin/working-pictures', {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                kind: kind || 'working',
-                                title,
-                                price: Number(price) || 0,
-                                telegramLink: url,
-                                previewImages: imgs,
-                                coverImage: imgs[0] || '',
-                                picturesCount: imgs.length,
-                                isActive: true,
-                                soldOut: false
-                            })
-                        });
-                        const label = kind === 'tools' ? 'Tools' : kind === 'format' ? 'Format' : 'Working Pictures';
-                        toast('Saved — appears on customer ' + label + ' page');
-                        if (typeof loadPacks === 'function') loadPacks(kind || 'working');
-                    } catch (e) { toast(e.message); }
-                    finally {
-                        if (btn) { btn.disabled = false; btn.textContent = 'Save this pack'; }
-                    }
-                };
+                        const prev = saveBtn.textContent;
+                        saveBtn.disabled = true;
+                        saveBtn.textContent = '......';
+                        try {
+                            const imgs = Array.isArray(form._previews) ? form._previews : [];
+                            const r = await api('/api/admin/working-pictures', {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    kind: kind,
+                                    title,
+                                    price: Number(price) || 0,
+                                    telegramLink: url,
+                                    previewImages: imgs,
+                                    coverImage: imgs[0] || '',
+                                    picturesCount: imgs.length,
+                                    isActive: true,
+                                    soldOut: false
+                                })
+                            });
+                            if (!r || !(r.item || r.ok)) throw new Error('Save failed');
+                            const label = kind === 'tools' ? 'Tools' : kind === 'format' ? 'Format' : 'Working Pictures';
+                            toast('Saved to database — customers see it on ' + label);
+                            if (typeof loadPacks === 'function') await loadPacks(kind);
+                            // clear form for next pack
+                            const t = form.querySelector('.pk-title'); if (t) t.value = '';
+                            const u = form.querySelector('.pk-url'); if (u) u.value = '';
+                            form._previews = [];
+                            const box = form.querySelector('.pk-previews'); if (box) box.innerHTML = '';
+                            if (photoInput) photoInput.value = '';
+                        } catch (e) {
+                            toast(e.message || 'Could not save pack');
+                        } finally {
+                            saveBtn.disabled = false;
+                            saveBtn.textContent = prev || 'Save this pack';
+                        }
+                    };
+                }
             });
         }
         function addPackForm(kind) {
             const map = { working: 'wpForms', tools: 'toolsForms', format: 'formatForms' };
             const el = document.getElementById(map[kind]);
+            if (!el) return;
             el.insertAdjacentHTML('beforeend', packFormHtml(kind));
             wirePackForm(el);
         }
-        document.getElementById('btnAddWpPack').onclick = () => addPackForm('working');
-        document.getElementById('btnAddToolsPack').onclick = () => addPackForm('tools');
-        document.getElementById('btnAddFormatPack').onclick = () => addPackForm('format');
-        addPackForm('working'); addPackForm('tools'); addPackForm('format');
+        document.getElementById('btnAddWpPack') && (document.getElementById('btnAddWpPack').onclick = () => addPackForm('working'));
+        document.getElementById('btnAddToolsPack') && (document.getElementById('btnAddToolsPack').onclick = () => addPackForm('tools'));
+        document.getElementById('btnAddFormatPack') && (document.getElementById('btnAddFormatPack').onclick = () => addPackForm('format'));
+        // initial forms
+        if (document.getElementById('wpForms') && !document.getElementById('wpForms').children.length) addPackForm('working');
+        if (document.getElementById('toolsForms') && !document.getElementById('toolsForms').children.length) addPackForm('tools');
+        if (document.getElementById('formatForms') && !document.getElementById('formatForms').children.length) addPackForm('format');
 
         async function loadPacks(kind) {
-            const d = await api('/api/admin/working-pictures');
-            const items = (d.items || []).filter((i) => (i.kind || 'working') === kind);
-            const map = { working: 'wpSaved', tools: 'toolsSaved', format: 'formatSaved' };
-            const box = document.getElementById(map[kind]);
-            box.innerHTML = items.map((it) => `
-        <div class="log-row">
-          <div><strong>${it.title}</strong><div class="muted">₦${Number(it.price).toLocaleString()}</div></div>
-          <button type="button" class="btn-out btn-sm" data-wpdel="${it._id}">Delete</button>
-        </div>`).join('') || '<span class="muted">None yet</span>';
-            box.querySelectorAll('[data-wpdel]').forEach((btn) => {
-                btn.onclick = async () => {
-                    await api('/api/admin/working-pictures/' + btn.getAttribute('data-wpdel'), { method: 'DELETE' });
-                    loadPacks(kind);
-                };
-            });
+            try {
+                const d = await api('/api/admin/working-pictures');
+                const items = (d.items || []).filter((i) => String(i.kind || 'working').toLowerCase() === String(kind).toLowerCase());
+                const map = { working: 'wpSaved', tools: 'toolsSaved', format: 'formatSaved' };
+                const box = document.getElementById(map[kind]);
+                if (!box) return;
+                box.innerHTML = items.map((it) => `
+          <div class="log-row">
+            <div><strong>${it.title}</strong><div class="muted">₦${Number(it.price || 0).toLocaleString()} · ${it.kind || kind}</div></div>
+            <button type="button" class="btn-out btn-sm" data-wpdel="${it._id}">Delete</button>
+          </div>`).join('') || '<span class="muted">None yet</span>';
+                box.querySelectorAll('[data-wpdel]').forEach((btn) => {
+                    btn.onclick = async () => {
+                        try {
+                            await api('/api/admin/working-pictures/' + btn.getAttribute('data-wpdel'), { method: 'DELETE' });
+                            loadPacks(kind);
+                        } catch (e) { toast(e.message); }
+                    };
+                });
+            } catch (e) {
+                console.warn('loadPacks', e);
+            }
         }
 
 

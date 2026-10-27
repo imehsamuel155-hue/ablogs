@@ -488,26 +488,42 @@ router.post('/working-pictures', adminAuth, async (req, res) => {
         if (body.previewImages && typeof body.previewImages === 'string') {
             body.previewImages = body.previewImages.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
         }
-        if (!body.coverImage && body.previewImages && body.previewImages[0]) {
-            body.coverImage = body.previewImages[0];
+        if (!Array.isArray(body.previewImages)) {
+            body.previewImages = body.previewImages ? [body.previewImages] : [];
         }
+        body.previewImages = body.previewImages
+            .filter((x) => typeof x === 'string' && x.trim())
+            .slice(0, 3);
+        if (!body.coverImage && body.previewImages[0]) body.coverImage = body.previewImages[0];
         body.isActive = true;
         body.soldOut = false;
-        if (!body.kind) body.kind = 'working';
+        let kind = String(body.kind || 'working').toLowerCase().trim();
+        if (!['working', 'tools', 'format'].includes(kind)) kind = 'working';
+        body.kind = kind;
+        body.title = String(body.title || '').trim();
+        body.price = Number(body.price) || 0;
+        body.telegramLink = String(body.telegramLink || body.url || '').trim();
+        body.picturesCount = body.previewImages.length || Number(body.picturesCount) || 0;
+        if (!body.title) return res.status(400).json({ error: 'Title required' });
+
         const item = await WorkingPicture.create(body);
         res.json({
+            ok: true,
             item: {
                 _id: String(item._id),
                 id: String(item._id),
                 kind: item.kind,
                 title: item.title,
                 price: item.price,
-                isActive: item.isActive
+                isActive: item.isActive,
+                previewImages: item.previewImages || [],
+                coverImage: item.coverImage || '',
+                telegramLink: item.telegramLink || ''
             }
         });
     } catch (e) {
-        console.error(e);
-        res.status(500).json({ error: 'Create failed' });
+        console.error('working-pictures create', e);
+        res.status(500).json({ error: e.message || 'Create failed' });
     }
 });
 

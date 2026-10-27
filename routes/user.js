@@ -168,22 +168,22 @@ router.get('/settings-public', async (req, res) => {
 
 router.get('/working-pictures', auth, async (req, res) => {
     try {
-        const kind = (req.query.kind || 'working').toLowerCase();
+        const kind = String(req.query.kind || 'working').toLowerCase().trim();
         const filter = { isActive: { $ne: false } };
         if (kind === 'tools' || kind === 'format' || kind === 'working') {
             filter.kind = kind;
         }
-        const items = await WorkingPicture.find(filter).sort({ createdAt: -1 });
+        const items = await WorkingPicture.find(filter).sort({ createdAt: -1 }).lean();
         res.json({
-            items: items.map((it) => ({
+            items: (items || []).map((it) => ({
                 _id: String(it._id),
                 id: String(it._id),
                 kind: it.kind || 'working',
-                title: it.title,
-                price: it.price,
+                title: it.title || '',
+                price: it.price || 0,
                 previewImages: it.previewImages || [],
                 coverImage: it.coverImage || '',
-                picturesCount: it.picturesCount || 0,
+                picturesCount: it.picturesCount || (it.previewImages || []).length || 0,
                 videosCount: it.videosCount || 0,
                 telegramLink: it.telegramLink || '',
                 description: it.description || ''
@@ -191,7 +191,7 @@ router.get('/working-pictures', auth, async (req, res) => {
         });
     } catch (e) {
         console.error(e);
-        res.status(500).json({ error: 'Failed' });
+        res.status(500).json({ error: 'Failed to load packs' });
     }
 });
 
