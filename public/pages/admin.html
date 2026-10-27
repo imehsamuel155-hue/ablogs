@@ -887,28 +887,35 @@
                     form._previews = previews;
                 };
                 form.querySelector('.pk-save').onclick = async () => {
+                    const btn = form.querySelector('.pk-save');
                     try {
                         const kind = form.getAttribute('data-kind');
                         const title = form.querySelector('.pk-title').value.trim();
                         const url = form.querySelector('.pk-url').value.trim();
                         const price = form.querySelector('.pk-price').value;
                         if (!title) return toast('Write a title');
+                        if (btn) { btn.disabled = true; btn.textContent = '......'; }
                         const imgs = form._previews || [];
                         await api('/api/admin/working-pictures', {
                             method: 'POST',
                             body: JSON.stringify({
-                                kind,
+                                kind: kind || 'working',
                                 title,
-                                price,
+                                price: Number(price) || 0,
                                 telegramLink: url,
                                 previewImages: imgs,
                                 coverImage: imgs[0] || '',
-                                picturesCount: imgs.length
+                                picturesCount: imgs.length,
+                                isActive: true,
+                                soldOut: false
                             })
                         });
-                        toast('Pack saved');
-                        loadPacks(kind);
+                        toast('Pack saved — check customer Working Pictures');
+                        if (typeof loadPacks === 'function') loadPacks(kind || 'working');
                     } catch (e) { toast(e.message); }
+                    finally {
+                        if (btn) { btn.disabled = false; btn.textContent = 'Save this pack'; }
+                    }
                 };
             });
         }

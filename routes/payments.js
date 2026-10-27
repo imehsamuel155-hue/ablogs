@@ -64,13 +64,49 @@ function encryptPayload(obj) {
 }
 
 /** Create / return dedicated virtual account for logged-in user */
+
+/** Return saved permanent virtual account for this user */
+router.get('/virtual-account', auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        const va = user.virtualAccount || {};
+        if (!va.accountNumber) return res.json({ virtualAccount: null });
+        res.json({
+            virtualAccount: {
+                accountNumber: va.accountNumber,
+                accountName: va.accountName || user.name || '',
+                bank: va.bank || va.bankName || '',
+                bankCode: va.bankCode || '',
+                reference: va.reference || ''
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message || 'Failed' });
+    }
+});
+
 router.post('/virtual-account', auth, async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        if (user.virtualAccount && user.virtualAccount.accountNumber) {
-            return res.json({ virtualAccount: user.virtualAccount, reused: true });
+        // Permanent VA per user — only reuse if account number actually exists
+        if (user.virtualAccount && String(user.virtualAccount.accountNumber || '').trim()) {
+            return res.json({
+                virtualAccount: {
+                    accountNumber: user.virtualAccount.accountNumber,
+                    accountName: user.virtualAccount.accountName || user.name || '',
+                    bank: user.virtualAccount.bank || user.virtualAccount.bankName || '',
+                    bankCode: user.virtualAccount.bankCode || '',
+                    reference: user.virtualAccount.reference || ''
+                },
+                reused: true
+            });
+        }
+        // clear broken empty VA so we can regenerate
+        if (user.virtualAccount && !user.virtualAccount.accountNumber) {
+            user.virtualAccount = undefined;
         }
 
         const phone = (req.body.phone || user.phone || '').replace(/\D/g, '');
@@ -121,16 +157,32 @@ router.post('/virtual-account', auth, async (req, res) => {
             });
         }
 
+        // TransactPay responses vary — dig for account fields
+        const d0 = data.data || data.result || data.payload || data;
+        const d1 = (d0 && typeof d0 === 'object') ? (d0.data || d0.account || d0.virtualAccount || d0) : {};
+        const dig = (...objs) => {
+            for (const o of objs) {
+                if (!o || typeof o !== 'object') continue;
+                const num = o.accountNumber || o.account_number || o.AccountNumber || o.nuban || o.accountNo || o.account_no;
+                if (num) return o;
+            }
+            return {};
+        };
+        const src = dig(d1, d0, data);
         const va = {
-            accountNumber: data.accountNumber || data.data?.account_number || data.data?.accountNumber || '',
-            accountName: data.accountName || data.data?.account_name || data.data?.accountName || user.name,
-            bank: data.bank || data.data?.bank_name || data.data?.bank || '',
-            bankCode: data.bankCode || data.data?.bankCode || '',
+            accountNumber: String(src.accountNumber || src.account_number || src.AccountNumber || src.nuban || src.accountNo || '').trim(),
+            accountName: String(src.accountName || src.account_name || src.AccountName || src.beneficiary_name || user.name || '').trim(),
+            bank: String(src.bank || src.bank_name || src.bankName || src.BankName || '').trim(),
+            bankCode: String(src.bankCode || src.bank_code || '').trim(),
             reference: reference
         };
 
         if (!va.accountNumber) {
-            return res.status(502).json({ error: 'No account number returned', detail: data });
+            console.error('TransactPay VA empty fields', JSON.stringify(data).slice(0, 2000));
+            return res.status(502).json({
+                error: 'Payment gateway did not return an account number. Check TransactPay keys on Render and that virtual accounts are enabled on your plan.',
+                detail: data
+            });
         }
 
         user.virtualAccount = va;

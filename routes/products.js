@@ -55,6 +55,10 @@ router.get('/meta/categories', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
     try {
+        const mongoose = require('mongoose');
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(404).json({ error: 'Invalid log id' });
+        }
         const product = await Product.findById(req.params.id);
         if (!product || !product.isActive) return res.status(404).json({ error: 'Not found' });
         const available = (product.stockItems || [])

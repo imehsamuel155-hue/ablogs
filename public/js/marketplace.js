@@ -250,7 +250,7 @@ const Market = (function () {
     function renderLogCards(list, grid) {
         if (!grid) return;
         grid.innerHTML = list.map((p) => `
-      <a class="cat-card" href="/category?id=${p._id}">
+      <a class="cat-card" href="/category?id=${encodeURIComponent(p._id || p.id)}">
         <div class="ico" style="display:flex;align-items:center;justify-content:center;min-height:48px;">
           ${p.image
                 ? `<img src="${escape(p.image)}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:10px;" />`
@@ -354,14 +354,21 @@ const Market = (function () {
             renderLogCards(all, grid);
             const sel = document.getElementById('filterCat');
             if (sel) {
-                const cats = [...new Set(all.map((p) => p.category).filter(Boolean))];
-                cats.forEach((c) => {
-                    if (![...sel.options].some((o) => o.value === c)) {
-                        const o = document.createElement('option');
-                        o.value = c;
-                        o.textContent = c.charAt(0).toUpperCase() + c.slice(1);
-                        sel.appendChild(o);
+                let cats = [...new Set(all.map((p) => p.category).filter(Boolean))];
+                try {
+                    const meta = await api('/api/products/meta/categories');
+                    if (meta.categories && meta.categories.length) {
+                        cats = [...new Set([...cats, ...meta.categories])];
                     }
+                } catch (_) { }
+                cats.sort((a, b) => String(a).localeCompare(String(b)));
+                // rebuild options
+                sel.innerHTML = '<option value="">All categories</option>';
+                cats.forEach((c) => {
+                    const o = document.createElement('option');
+                    o.value = c;
+                    o.textContent = c.charAt(0).toUpperCase() + c.slice(1);
+                    sel.appendChild(o);
                 });
                 sel.addEventListener('change', () => {
                     const c = sel.value.toLowerCase();
@@ -394,11 +401,15 @@ const Market = (function () {
         } catch (_) { }
 
         const box = document.getElementById('productList');
-        if (!id || !box) return;
+        if (!box) return;
+        if (!id) {
+            box.innerHTML = '<p class="muted">No log selected. Go back to Logs and tap a product.</p>';
+            return;
+        }
         try {
-            const d = await api('/api/products/' + id);
+            const d = await api('/api/products/' + encodeURIComponent(id));
             const p = d.product;
-            if (!p) { box.innerHTML = '<p class="muted">Not found</p>'; return; }
+            if (!p) { box.innerHTML = '<p class="muted">Log not found. It may be sold out or removed.</p>'; return; }
             const titleEl = document.getElementById('catTitle');
             if (titleEl) titleEl.textContent = p.title;
 
@@ -486,8 +497,21 @@ const Market = (function () {
                 });
             });
         } catch (e) {
-            toast(e.message);
+            console.error(e);
+            box.innerHTML = '<p class="muted">Could not load this log: ' + escape(e.message || 'error') + '</p><p><a href="/products">Back to Logs</a></p>';
+            toast(e.message || 'Could not load log');
         }
+    }
+
+    function showVaBox(va) {
+        const box = document.getElementById('vaBox');
+        if (!box || !va) return;
+        box.style.display = 'block';
+        box.innerHTML = `
+      <p><strong>Account name:</strong> ${escape(va.accountName || va.account_name || '')}</p>
+      <p><strong>Account number:</strong> <span style="font-size:1.15rem;font-weight:800;letter-spacing:1px;">${escape(va.accountNumber || va.account_number || '')}</span></p>
+      <p><strong>Bank:</strong> ${escape(va.bank || va.bankName || va.bank_name || '')}</p>
+      <p class="muted">This account is permanent for your login. Transfer any amount — it credits after confirmation.</p>`;
     }
 
     async function initWallet() {
@@ -497,6 +521,17 @@ const Market = (function () {
             const dash = await api('/api/user/dashboard');
             const el = document.getElementById('walletBal');
             if (el) el.textContent = money(dash.user.balance);
+            if (dash.user.phone) {
+                const ph = document.getElementById('vaPhone');
+                if (ph && !ph.value) ph.value = dash.user.phone;
+            }
+        } catch (_) { }
+        // Load permanent VA if already created
+        try {
+            const saved = await api('/api/payments/virtual-account');
+            if (saved.virtualAccount && saved.virtualAccount.accountNumber) {
+                showVaBox(saved.virtualAccount);
+            }
         } catch (_) { }
         document.getElementById('btnCreateVA')?.addEventListener('click', async () => {
             const btn = document.getElementById('btnCreateVA');
@@ -513,16 +548,11 @@ const Market = (function () {
                     body: JSON.stringify({ phone })
                 });
                 const va = r.virtualAccount || r;
-                const box = document.getElementById('vaBox');
-                if (box) {
-                    box.style.display = 'block';
-                    box.innerHTML = `
-            <p><strong>Account name:</strong> ${escape(va.accountName || va.account_name || '')}</p>
-            <p><strong>Account number:</strong> ${escape(va.accountNumber || va.account_number || '')}</p>
-            <p><strong>Bank:</strong> ${escape(va.bank || va.bankName || va.bank_name || '')}</p>
-            <p class="muted">Transfer any amount — it credits your wallet after confirmation.</p>`;
+                if (!va.accountNumber && !va.account_number) {
+                    throw new Error(r.error || 'Gateway returned empty account. Check TransactPay keys on Render.');
                 }
-                toast('Deposit account ready');
+                showVaBox(va);
+                toast(r.reused ? 'Your permanent deposit account' : 'Deposit account ready');
             } catch (e) { toast(e.message || 'Could not get deposit account'); }
             finally {
                 if (btn) { btn.disabled = false; btn.textContent = prev || 'Get deposit account number'; }
@@ -588,7 +618,7 @@ const Market = (function () {
             <button type="button" class="btn btn-red btn-wp-buy" data-id="${it._id}" data-price="${it.price}">Purchase</button>
           </div>
         </div>`;
-            }).join('') || '<p class="muted">No packs yet</p>';
+            }).join('') || '<p class="muted">No packs yet — admin must Save this pack first</p>';
             grid.querySelectorAll('.btn-wp-buy').forEach((btn) => {
                 btn.addEventListener('click', async () => {
                     if (balance < Number(btn.getAttribute('data-price'))) {
@@ -644,7 +674,7 @@ const Market = (function () {
             <button type="button" class="btn btn-red btn-wp-buy" data-id="${it._id}" data-price="${it.price}">Buy</button>
           </div>
         </div>`;
-            }).join('') || '<p class="muted">Nothing listed yet</p>';
+            }).join('') || '<p class="muted">No packs yet — admin must Save this pack first</p>';
             grid.querySelectorAll('.btn-wp-buy').forEach((btn) => {
                 btn.addEventListener('click', async () => {
                     if (balance < Number(btn.getAttribute('data-price'))) {
