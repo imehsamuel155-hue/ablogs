@@ -169,11 +169,28 @@ router.get('/settings-public', async (req, res) => {
 router.get('/working-pictures', auth, async (req, res) => {
     try {
         const kind = (req.query.kind || 'working').toLowerCase();
-        const filter = { isActive: true, soldOut: { $ne: true } };
-        if (kind === 'tools' || kind === 'format' || kind === 'working') filter.kind = kind;
+        const filter = { isActive: { $ne: false } };
+        if (kind === 'tools' || kind === 'format' || kind === 'working') {
+            filter.kind = kind;
+        }
         const items = await WorkingPicture.find(filter).sort({ createdAt: -1 });
-        res.json({ items });
+        res.json({
+            items: items.map((it) => ({
+                _id: String(it._id),
+                id: String(it._id),
+                kind: it.kind || 'working',
+                title: it.title,
+                price: it.price,
+                previewImages: it.previewImages || [],
+                coverImage: it.coverImage || '',
+                picturesCount: it.picturesCount || 0,
+                videosCount: it.videosCount || 0,
+                telegramLink: it.telegramLink || '',
+                description: it.description || ''
+            }))
+        });
     } catch (e) {
+        console.error(e);
         res.status(500).json({ error: 'Failed' });
     }
 });

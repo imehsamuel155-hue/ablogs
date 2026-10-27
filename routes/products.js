@@ -1,7 +1,28 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Product = require('../models/Product');
 
 const router = express.Router();
+
+function mapListItem(p) {
+    const left = (p.stockItems || []).filter((s) => !s.sold).length;
+    return {
+        _id: String(p._id),
+        id: String(p._id),
+        title: p.title,
+        category: p.category,
+        price: p.price,
+        description: p.description || '',
+        image: p.image || '',
+        stock: left,
+        piecesLeft: left,
+        duration: p.duration || '',
+        formatText: p.formatText || '',
+        isHot: !!p.isHot,
+        viewAccountLink: p.viewAccountLink || '',
+        icon: p.icon || ''
+    };
+}
 
 router.get('/', async (req, res) => {
     try {
@@ -22,24 +43,10 @@ router.get('/', async (req, res) => {
             ];
         }
         const products = await Product.find(filter).sort({ createdAt: -1 });
-        res.json({
-            products: products.map((p) => ({
-                _id: p._id,
-                title: p.title,
-                category: p.category,
-                price: p.price,
-                description: p.description,
-                image: p.image,
-                stock: (p.stockItems || []).filter((s) => !s.sold).length,
-                piecesLeft: (p.stockItems || []).filter((s) => !s.sold).length,
-                duration: p.duration || '',
-                formatText: p.formatText || '',
-                isHot: !!p.isHot,
-                viewAccountLink: p.viewAccountLink || '',
-                icon: p.icon || ''
-            }))
-        });
+        // show products even with 0 stock so category list stays; detail handles empty
+        res.json({ products: products.map(mapListItem) });
     } catch (e) {
+        console.error(e);
         res.status(500).json({ error: 'Failed to load logs' });
     }
 });
@@ -55,29 +62,32 @@ router.get('/meta/categories', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
     try {
-        const mongoose = require('mongoose');
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        const raw = String(req.params.id || '').trim();
+        if (!mongoose.Types.ObjectId.isValid(raw)) {
             return res.status(404).json({ error: 'Invalid log id' });
         }
-        const product = await Product.findById(req.params.id);
-        if (!product || !product.isActive) return res.status(404).json({ error: 'Not found' });
+        const product = await Product.findById(raw);
+        if (!product) return res.status(404).json({ error: 'Log not found' });
+        if (!product.isActive) return res.status(404).json({ error: 'Log is inactive' });
+
         const available = (product.stockItems || [])
             .filter((s) => !s.sold)
             .map((s, idx) => ({
-                id: s._id,
+                id: String(s._id),
                 index: idx + 1,
-                // do not send full login until purchased — only optional per-line preview
                 hasPreview: !!(s.previewLink || product.viewAccountLink),
                 previewLink: s.previewLink || product.viewAccountLink || ''
             }));
+
         res.json({
             product: {
-                _id: product._id,
+                _id: String(product._id),
+                id: String(product._id),
                 title: product.title,
                 category: product.category,
                 price: product.price,
-                description: product.description,
-                image: product.image,
+                description: product.description || '',
+                image: product.image || '',
                 stock: available.length,
                 piecesLeft: available.length,
                 duration: product.duration || '',
@@ -89,6 +99,7 @@ router.get('/:id', async (req, res) => {
             }
         });
     } catch (e) {
+        console.error(e);
         res.status(500).json({ error: 'Failed to load log' });
     }
 });

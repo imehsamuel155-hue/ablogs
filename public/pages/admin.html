@@ -286,13 +286,17 @@
             <div class="drop-title" data-drop="logs">Add log <span>▼</span></div>
             <div class="drop-body" id="drop-logs">
                 <label>Category</label>
-                <select id="pCat">
-                    <option value="">— Select —</option>
-                    <option value="add">Type your own category…</option>
-                </select>
-                <div id="customWrap" style="display:none;">
-                    <label>Custom category name</label>
-                    <input id="pCustom" placeholder="e.g. texting app" />
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+                    <select id="pCat" style="flex:1;">
+                        <option value="">— Select category —</option>
+                    </select>
+                    <button type="button" class="btn-out btn-sm" id="btnAddCat" title="Add category">+</button>
+                </div>
+                <div id="customWrap" style="display:none;margin-bottom:10px;">
+                    <label>New category name</label>
+                    <input id="pCustom" placeholder="e.g. Facebook, Instagram, VPN" />
+                    <button type="button" class="btn-out btn-sm" id="btnConfirmCat" style="margin-top:6px;">Add
+                        category</button>
                 </div>
                 <div id="formBox" style="display:none;">
                     <label>Photo (gallery)</label>
@@ -448,6 +452,44 @@
                 body.classList.toggle('open');
             };
         });
+
+
+        async function refreshAdminCategories() {
+            const sel = document.getElementById('pCat');
+            if (!sel) return;
+            const cur = sel.value;
+            try {
+                const d = await api('/api/admin/products');
+                const cats = [...new Set((d.products || []).map((p) => p.category).filter(Boolean))].sort();
+                sel.innerHTML = '<option value="">— Select category —</option>';
+                cats.forEach((c) => {
+                    const o = document.createElement('option');
+                    o.value = c;
+                    o.textContent = c;
+                    sel.appendChild(o);
+                });
+                if (cur) sel.value = cur;
+            } catch (_) { }
+        }
+        document.getElementById('btnAddCat')?.addEventListener('click', () => {
+            const w = document.getElementById('customWrap');
+            if (w) w.style.display = w.style.display === 'none' ? 'block' : 'none';
+        });
+        document.getElementById('btnConfirmCat')?.addEventListener('click', () => {
+            const name = (document.getElementById('pCustom')?.value || '').trim();
+            if (!name) return toast('Enter category name');
+            const sel = document.getElementById('pCat');
+            if (![...sel.options].some((o) => o.value.toLowerCase() === name.toLowerCase())) {
+                const o = document.createElement('option');
+                o.value = name.toLowerCase();
+                o.textContent = name;
+                sel.appendChild(o);
+            }
+            sel.value = name.toLowerCase();
+            document.getElementById('customWrap').style.display = 'none';
+            toast('Category ready — fill title & logins then Save log');
+        });
+        refreshAdminCategories();
 
         // LOGS
         let lineCount = 0;

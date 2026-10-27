@@ -249,20 +249,27 @@ const Market = (function () {
 
     function renderLogCards(list, grid) {
         if (!grid) return;
-        grid.innerHTML = list.map((p) => `
-      <a class="cat-card" href="/category?id=${encodeURIComponent(p._id || p.id)}">
+        if (!list || !list.length) {
+            grid.innerHTML = '<p class="muted">No logs yet</p>';
+            return;
+        }
+        grid.innerHTML = list.map((p) => {
+            const pid = String(p._id || p.id || '');
+            const left = (p.piecesLeft != null ? p.piecesLeft : p.stock) || 0;
+            return `
+      <a class="cat-card" href="/category?id=${encodeURIComponent(pid)}">
         <div class="ico" style="display:flex;align-items:center;justify-content:center;min-height:48px;">
           ${p.image
-                ? `<img src="${escape(p.image)}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:10px;" />`
-                : `<span style="font-weight:800;color:#dc2626;">${escape((p.category || 'LOG').slice(0, 3).toUpperCase())}</span>`}
+                    ? `<img src="${escape(p.image)}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:10px;" />`
+                    : `<span style="font-weight:800;color:#dc2626;">${escape((p.category || 'LOG').slice(0, 3).toUpperCase())}</span>`}
         </div>
-        <h3>${escape(p.title)}</h3>
-        <p>${escape(p.description || '')}</p>
+        <h3>${escape(p.title || '')}</h3>
+        <p>${escape(p.category || '')}</p>
         <div style="margin-top:8px;font-size:0.82rem;color:#64748b;">
-          ${money(p.price)} · ${p.piecesLeft != null ? p.piecesLeft : p.stock} pieces
+          ${money(p.price)} · ${left} piece${left === 1 ? '' : 's'}
         </div>
-      </a>
-    `).join('') || '<p class="muted">No logs yet</p>';
+      </a>`;
+        }).join('');
     }
 
     async function initDashboard() {
@@ -391,8 +398,11 @@ const Market = (function () {
     async function initCategory() {
         if (!requireAuth()) return;
         wireDrawer(); wireChat();
-        const id = new URLSearchParams(location.search).get('id');
+        const id = (new URLSearchParams(location.search).get('id') || '').trim();
         let balance = 0;
+        const box = document.getElementById('productList');
+        if (!box) return;
+
         try {
             const dash = await api('/api/user/dashboard');
             balance = Number(dash.user.balance || 0);
@@ -400,27 +410,53 @@ const Market = (function () {
             if (bp) bp.textContent = money(balance);
         } catch (_) { }
 
-        const box = document.getElementById('productList');
-        if (!box) return;
         if (!id) {
-            box.innerHTML = '<p class="muted">No log selected. Go back to Logs and tap a product.</p>';
+            box.innerHTML = '<p class="muted">No log selected. <a href="/products">Back to Logs</a></p>';
             return;
         }
+
+        box.innerHTML = '<p class="muted">Loading…</p>';
+
         try {
-            const d = await api('/api/products/' + encodeURIComponent(id));
-            const p = d.product;
-            if (!p) { box.innerHTML = '<p class="muted">Log not found. It may be sold out or removed.</p>'; return; }
+            let p = null;
+            try {
+                const d = await api('/api/products/' + encodeURIComponent(id));
+                p = d.product || d;
+            } catch (err) {
+                // fallback: find in full list
+                const all = await api('/api/products');
+                const list = all.products || [];
+                p = list.find((x) => String(x._id || x.id) === String(id)) || null;
+                if (p) {
+                    // still need accounts — refetch detail only
+                    try {
+                        const d2 = await api('/api/products/' + encodeURIComponent(id));
+                        p = d2.product || p;
+                    } catch (_) { }
+                } else {
+                    throw err;
+                }
+            }
+
+            if (!p || !(p._id || p.id || p.title)) {
+                box.innerHTML = '<p class="muted">Log not found. <a href="/products">Back to Logs</a></p>';
+                return;
+            }
+
             const titleEl = document.getElementById('catTitle');
-            if (titleEl) titleEl.textContent = p.title;
+            if (titleEl) titleEl.textContent = p.title || 'Log';
 
             const accounts = p.accounts || [];
+            const left = p.piecesLeft != null ? p.piecesLeft : (p.stock || accounts.length || 0);
+            const pid = String(p._id || p.id || id);
+
             box.innerHTML = `
         <div class="list-card" style="padding:16px;margin-bottom:12px;">
           <div style="display:flex;gap:12px;align-items:center;">
             ${p.image ? `<img src="${escape(p.image)}" style="width:64px;height:64px;object-fit:cover;border-radius:12px;" />` : ''}
             <div>
-              <h3 style="margin:0 0 4px;">${escape(p.title)}</h3>
-              <div class="muted" style="font-size:0.85rem;">${money(p.price)} · ${p.piecesLeft} pieces left</div>
+              <h3 style="margin:0 0 4px;">${escape(p.title || '')}</h3>
+              <div class="muted" style="font-size:0.85rem;">${escape(p.category || '')} · ${money(p.price)} · ${left} left</div>
             </div>
           </div>
           <p style="margin:10px 0 0;font-size:0.9rem;color:#64748b;">${escape(p.description || '')}</p>
@@ -428,23 +464,15 @@ const Market = (function () {
         <div class="list-card" style="padding:12px 16px;">
           <strong style="font-size:0.9rem;">Available accounts</strong>
           <div id="acctList">
-            ${accounts.map((a) => `
-              <div class="acct-row">
-                <span class="idx">${a.index}.</span>
+            ${accounts.length ? accounts.map((a) => `
+              <div class="acct-row" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;">
+                <span class="idx" style="font-weight:700;min-width:24px;">${a.index}.</span>
                 ${a.previewLink
-                    ? `<a class="eye-btn" href="${escape(a.previewLink)}" target="_blank" rel="noopener" title="View account">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-                      </svg>
-                    </a>`
-                    : `<span class="eye-btn" style="opacity:.35;pointer-events:none;">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-                      </svg>
-                    </span>`}
-                <button type="button" class="btn btn-red btn-buy-one" data-stock="${a.id}" data-price="${p.price}" style="margin-left:auto;padding:8px 14px;border-radius:999px;">Buy</button>
+                    ? `<a class="eye-btn" href="${escape(a.previewLink)}" target="_blank" rel="noopener" title="View">👁 View</a>`
+                    : `<span class="muted" style="font-size:0.8rem;">No preview</span>`}
+                <button type="button" class="btn btn-red btn-buy-one" data-stock="${escape(String(a.id))}" data-price="${p.price}" style="margin-left:auto;padding:8px 14px;border-radius:999px;">Buy</button>
               </div>
-            `).join('') || '<p class="muted" style="padding:10px 0;">No pieces left</p>'}
+            `).join('') : '<p class="muted" style="padding:10px 0;">No pieces left (out of stock)</p>'}
           </div>
         </div>
       `;
@@ -457,12 +485,12 @@ const Market = (function () {
                         return;
                     }
                     btn.disabled = true;
-                    btn.textContent = '…';
+                    btn.textContent = '......';
                     try {
                         const r = await api('/api/user/buy', {
                             method: 'POST',
                             body: JSON.stringify({
-                                productId: p._id,
+                                productId: pid,
                                 stockItemId: btn.getAttribute('data-stock')
                             })
                         });
@@ -481,7 +509,7 @@ const Market = (function () {
                 <a href="/purchases" class="btn btn-white" style="display:block;text-align:center;margin-top:8px;">View Orders</a>
               </div>`;
                         document.body.appendChild(modal);
-                        document.getElementById('okClose').onclick = () => { modal.remove(); location.reload(); };
+                        document.getElementById('okClose').onclick = () => { modal.remove(); location.href = '/purchases'; };
                         document.getElementById('okCopy').onclick = () => {
                             const ta = document.getElementById('okLogin');
                             navigator.clipboard?.writeText(ta.value).then(() => toast('Copied')).catch(() => {
@@ -489,8 +517,7 @@ const Market = (function () {
                             });
                         };
                     } catch (e) {
-                        toast(e.message || 'Please fund your account. Your balance is not enough.');
-                    } finally {
+                        toast(e.message || 'Purchase failed');
                         btn.disabled = false;
                         btn.textContent = 'Buy';
                     }
@@ -499,7 +526,6 @@ const Market = (function () {
         } catch (e) {
             console.error(e);
             box.innerHTML = '<p class="muted">Could not load this log: ' + escape(e.message || 'error') + '</p><p><a href="/products">Back to Logs</a></p>';
-            toast(e.message || 'Could not load log');
         }
     }
 
@@ -653,7 +679,7 @@ const Market = (function () {
             const bp = document.getElementById('balPill');
             if (bp) bp.textContent = money(balance);
         } catch (_) { }
-        const grid = document.getElementById('packGrid') || document.getElementById('wpGrid');
+        const grid = document.getElementById('wpGrid') || document.getElementById('packGrid') || document.getElementById('toolsGrid') || document.getElementById('formatGrid');
         try {
             const d = await api('/api/user/working-pictures?kind=' + encodeURIComponent(kind || 'working'));
             if (!grid) return;
